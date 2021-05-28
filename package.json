@@ -8,7 +8,8 @@
   "private": false,
   "scripts": {
     "build": "tsc",
-    "test": "mocha -r ts-node/register 'test/**/*.test.ts'"
+    "test": "mocha -r ts-node/register 'test/**/*.test.ts'",
+    "start": "node dist"
   },
   "devDependencies": {
     "@types/chai": "^4.2.18",
@@ -23,6 +24,7 @@
     "typescript": "^4.3.2"
   },
   "dependencies": {
+    "@influxdata/influxdb-client": "^1.13.0",
     "ws": "^7.4.6"
   }
 }

@@ -2,6 +2,11 @@
 # yarn lockfile v1
 
 
+"@influxdata/influxdb-client@^1.13.0":
+  version "1.13.0"
+  resolved "https://registry.yarnpkg.com/@influxdata/influxdb-client/-/influxdb-client-1.13.0.tgz#a5c52596720d13253c7ac5527bceeb634713c78f"
+  integrity sha512-ZbWTJ3fHt2HTgKg7/hADgUc0PI1DtYwo95mF8WjSFp/hZ+hG8NQWv+x8gUroxwX3HgfqZL3TNSPHsWf5v+mCGg==
+
 "@tsconfig/node10@^1.0.7":
   version "1.0.7"
   resolved "https://registry.yarnpkg.com/@tsconfig/node10/-/node10-1.0.7.tgz#1eb1de36c73478a2479cc661ef5af1c16d86d606"
