@@ -1,0 +1,20 @@
+{
+  "name": "reimagined-umbrella",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "repository": "https://github.com/leonrinkel/reimagined-umbrella.git",
+  "author": "Leon Rinkel <leon@rinkel.me>",
+  "license": "MIT",
+  "private": false,
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^15.6.1",
+    "@types/ws": "^7.4.4",
+    "typescript": "^4.3.2"
+  },
+  "dependencies": {
+    "ws": "^7.4.6"
+  }
+}
