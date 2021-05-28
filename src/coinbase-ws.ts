@@ -6,17 +6,9 @@ import {
     SubscriptionsResponse,
     TickerResponse
 } from "./coinbase-types";
+import { TimeReviver } from "./time-reviver";
 
 const DEFAULT_URL = "wss://ws-feed.pro.coinbase.com";
-
-const timeReviver =
-    (key: string, value: string) => {
-        if (
-            key === "time" &&
-            typeof value === "string"
-        ) return new Date(value);
-        return value;
-    };
 
 export declare interface CoinbaseWebSocket {
     on(event: "subscriptions", listener: (e: SubscriptionsResponse) => void): void;
@@ -72,7 +64,7 @@ export class CoinbaseWebSocket {
     }
 
     private _onMessage(data: ws.Data) {
-        const message = JSON.parse(data.toString("utf-8"), timeReviver);
+        const message = JSON.parse(data.toString("utf-8"), TimeReviver);
         if (
             message.type === "subscriptions" ||
             message.type === "heartbeat" ||

@@ -10,6 +10,14 @@
             "group": "build",
             "label": "npm: build",
             "detail": "tsc"
+        },
+        {
+            "type": "npm",
+            "script": "test",
+            "group": "test",
+            "problemMatcher": [],
+            "label": "npm: test",
+            "detail": "mocha -r ts-node/register 'test/**/*.test.ts'"
         }
     ]
 }
