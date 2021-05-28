@@ -20,6 +20,8 @@ const MEASUREMENT_FIELD_BEST_BID = "best_bid";
 const MEASUREMENT_FIELD_BEST_ASK = "best_ask";
 const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
 
+const TIMEOUT_INTERVAL = 10_000;
+
 (async () => {
 
     const influxUrl = process.env.INFLUX_URL || DEFAULT_INFLUX_URL;
@@ -51,6 +53,12 @@ const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
     );
 
     const coinbase = new CoinbaseWebSocket();
+
+    let lastHeartbeat = new Date();
+    coinbase.on("heartbeat", (heartbeat) => {
+        lastHeartbeat = heartbeat.time;
+    });
+
     coinbase.on("ticker", (ticker) => {
         const point = new Point(MEASUREMENT_NAME);
         point
@@ -70,6 +78,15 @@ const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
     });
 
     await coinbase.open();
+    await coinbase.subscribeHeartbeat(...productIds.split(","));
     await coinbase.subscribeTicker(...productIds.split(","));
+
+    setInterval(() => {
+        if (lastHeartbeat.getTime() < Date.now() - TIMEOUT_INTERVAL) {
+            process.stderr.write(
+                `received no heartbeats for more than ${TIMEOUT_INTERVAL} ms`);
+            process.exit(1);
+        }
+    }, TIMEOUT_INTERVAL);
 
 })();
