@@ -59,6 +59,20 @@ export class CoinbaseWebSocket {
         });
     }
 
+    public subscribeHeartbeat(...productIds: string[]): Promise<void> {
+        return this.subscribe({
+            type: "subscribe",
+            channels: [ { name: "heartbeat", product_ids: productIds } ]
+        });
+    }
+
+    public subscribeTicker(...productIds: string[]): Promise<void> {
+        return this.subscribe({
+            type: "subscribe",
+            channels: [ { name: "ticker", product_ids: productIds } ]
+        });
+    }
+
     public on(event: string, listener: (...args: any[]) => void) {
         this._events.on(event, listener);
     }

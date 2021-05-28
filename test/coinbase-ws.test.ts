@@ -219,4 +219,50 @@ describe("CoinbaseWebSocket", () => {
 
     });
 
+    describe("#subscribeHeartbeat()", () => {
+
+        it("should send the request message", (done) => {
+            const request: SubscribeRequest = {
+                type: "subscribe",
+                channels: [
+                    { name: "heartbeat", product_ids: [ "ETH-USD", "ETH-EUR" ] }
+                ]
+            };
+
+            wss.once("connection", (socket) =>
+                socket.once("message", (data) => {
+                    expect(data.toString("utf-8"))
+                        .to.equal(JSON.stringify(request));
+                    done();
+                }));
+
+            const cws = new CoinbaseWebSocket({ url });
+            cws.open().then(() => cws.subscribeHeartbeat("ETH-USD", "ETH-EUR"));
+        });
+
+    });
+
+    describe("#subscribeTicker()", () => {
+
+        it("should send the request message", (done) => {
+            const request: SubscribeRequest = {
+                type: "subscribe",
+                channels: [
+                    { name: "ticker", product_ids: [ "ETH-USD", "ETH-EUR" ] }
+                ]
+            };
+
+            wss.once("connection", (socket) =>
+                socket.once("message", (data) => {
+                    expect(data.toString("utf-8"))
+                        .to.equal(JSON.stringify(request));
+                    done();
+                }));
+
+            const cws = new CoinbaseWebSocket({ url });
+            cws.open().then(() => cws.subscribeTicker("ETH-USD", "ETH-EUR"));
+        });
+
+    });
+
 });
