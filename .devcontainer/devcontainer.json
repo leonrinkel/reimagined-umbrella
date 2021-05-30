@@ -1,0 +1,11 @@
+{
+    "name": "Node.js",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "settings": {
+        "terminal.integrated.defaultProfile.linux": "/bin/bash"
+    },
+    "postCreateCommand": "yarn install",
+    "remoteUser": "node"
+}
