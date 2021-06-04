@@ -2,11 +2,13 @@ import { InfluxDB, Point } from "@influxdata/influxdb-client";
 import process from "process";
 import { CoinbaseWebSocket } from "./coinbase-ws";
 
+// default values for env variable options
 const DEFAULT_INFLUX_URL = "http://localhost:8086";
 const DEFAULT_INFLUX_ORG = "reimagined-umbrella";
 const DEFAULT_INFLUX_BUCKET = "reimagined-umbrella";
-const DEFAULT_FLUSH_INTERVAL = 10_000;
+const DEFAULT_FLUSH_INTERVAL = 10_000 /* ms */; // bundle writes and flush after some time
 
+// influx measurement name, tag name, field names to use
 const MEASUREMENT_NAME = "ticker";
 const MEASUREMENT_TAG_PRODUCT_ID = "product_id";
 const MEASUREMENT_TAG_SIDE = "side";
@@ -20,9 +22,12 @@ const MEASUREMENT_FIELD_BEST_BID = "best_bid";
 const MEASUREMENT_FIELD_BEST_ASK = "best_ask";
 const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
 
-const TIMEOUT_INTERVAL = 10_000;
+// the program will timeout if no heartbeat events have been received
+const TIMEOUT_INTERVAL = 10_000 /* ms */;
 
 (async () => {
+
+    // read env variable options
 
     const influxUrl = process.env.INFLUX_URL || DEFAULT_INFLUX_URL;
     const influxOrg = process.env.INFLUX_ORG || DEFAULT_INFLUX_ORG;
@@ -39,18 +44,22 @@ const TIMEOUT_INTERVAL = 10_000;
         process.exit(1);
     }
 
-    const productIds = process.env.PRODUCT_IDS;
+    const productIds = process.env.PRODUCT_IDS; // comma separated list
     if (!productIds) {
         process.stderr.write(
             "PRODUCT_IDS environment variable has to be specified");
         process.exit(1);
     }
 
+    // open a new influx write api
+
     const influx = new InfluxDB({ url: influxUrl, token: influxToken });
     const writeApi = influx.getWriteApi(
         influxOrg, influxBucket, undefined,
         { flushInterval: influxFlushInterval }
     );
+
+    // create a new coinbase socket and register event listeners
 
     const coinbase = new CoinbaseWebSocket();
 
@@ -60,6 +69,7 @@ const TIMEOUT_INTERVAL = 10_000;
     });
 
     coinbase.on("ticker", (ticker) => {
+        // create point and queue to write
         const point = new Point(MEASUREMENT_NAME);
         point
             .timestamp(ticker.time)
@@ -77,10 +87,12 @@ const TIMEOUT_INTERVAL = 10_000;
         writeApi.writePoint(point);
     });
 
+    // open connection and subscribe to channels
     await coinbase.open();
     await coinbase.subscribeHeartbeat(...productIds.split(","));
     await coinbase.subscribeTicker(...productIds.split(","));
 
+    // monitor heartbeats
     setInterval(() => {
         if (lastHeartbeat.getTime() < Date.now() - TIMEOUT_INTERVAL) {
             process.stderr.write(

@@ -16,6 +16,10 @@ export declare interface CoinbaseWebSocket {
     on(event: "ticker", listener: (e: TickerResponse) => void): void;
 }
 
+/**
+ * Websocket wrapper with convenience functions for subscribing coinbase api
+ * channels
+ */
 export class CoinbaseWebSocket {
 
     private _url: string;
@@ -26,6 +30,10 @@ export class CoinbaseWebSocket {
         this._url = options?.url || DEFAULT_URL;
     }
 
+    /**
+     * Opens a websocket connection
+     * @returns a promise that will be resolved when the connection succeeded
+     */
     public open(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             this._ws = new ws(this._url);
@@ -35,6 +43,12 @@ export class CoinbaseWebSocket {
         });
     }
 
+    /**
+     * Sends a subscribe request
+     * @param request the request
+     * @returns a promise that will be resolved when the subscription has been
+     *          acknowledged or rejected otherwise
+     */
     public subscribe(request: SubscribeRequest): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             this._ws?.send(JSON.stringify(request));
@@ -59,6 +73,12 @@ export class CoinbaseWebSocket {
         });
     }
 
+    /**
+     * Convenience function to subscribe to the heartbeat channel
+     * @param productIds a list of product ids
+     * @returns a promise that will be resolved when the subscription has been
+     *          acknowledged or rejected otherwise
+     */
     public subscribeHeartbeat(...productIds: string[]): Promise<void> {
         return this.subscribe({
             type: "subscribe",
@@ -66,6 +86,12 @@ export class CoinbaseWebSocket {
         });
     }
 
+    /**
+     * Convenience function to subscribe to the ticker channel
+     * @param productIds a list of product ids
+     * @returns a promise that will be resolved when the subscription has been
+     *          acknowledged or rejected otherwise
+     */
     public subscribeTicker(...productIds: string[]): Promise<void> {
         return this.subscribe({
             type: "subscribe",
@@ -73,6 +99,11 @@ export class CoinbaseWebSocket {
         });
     }
 
+    /**
+     * Registers an event listener.
+     * @param event the event name
+     * @param listener the listener callback to register
+     */
     public on(event: string, listener: (...args: any[]) => void) {
         this._events.on(event, listener);
     }
