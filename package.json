@@ -1,6 +1,6 @@
 {
   "name": "reimagined-umbrella",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "main": "dist/index.js",
   "repository": "https://github.com/leonrinkel/reimagined-umbrella.git",
   "author": "Leon Rinkel <leon@rinkel.me>",
