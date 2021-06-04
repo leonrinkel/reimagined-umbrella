@@ -16,7 +16,7 @@ docker run \
     reimagined-umbrella
 ```
 
-Note: `--restart always` is required since Coinbase disconnects after some time. The program will then just exit and expect Docker to restart it.
+Note: `--restart always` is required since Coinbase disconnects after some time. The program will then just exit and expect Docker to restart it. I might change the WebSocket to automatically reconnect, but for now this works as well.
 
 ## Example Dashboard
 
