@@ -1,15 +1,15 @@
 {
   "name": "reimagined-umbrella",
   "version": "1.0.0",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "repository": "https://github.com/leonrinkel/reimagined-umbrella.git",
   "author": "Leon Rinkel <leon@rinkel.me>",
   "license": "MIT",
   "private": false,
   "scripts": {
     "build": "tsc",
-    "test": "mocha -r ts-node/register 'test/**/*.test.ts'",
-    "start": "node dist"
+    "test": "mocha 'dist/test/**/*.test.js'",
+    "start": "node dist/src/index.js"
   },
   "devDependencies": {
     "@types/chai": "^4.2.18",
@@ -22,7 +22,6 @@
     "chai-as-promised": "^7.1.1",
     "mocha": "^8.4.0",
     "sinon": "^11.1.1",
-    "ts-node": "^10.0.0",
     "typescript": "^4.3.2"
   },
   "dependencies": {
