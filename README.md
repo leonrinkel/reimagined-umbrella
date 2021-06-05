@@ -1,7 +1,7 @@
 # reimagined-umbrella
 
 [![](https://img.shields.io/npm/v/reimagined-umbrella)](https://www.npmjs.com/package/reimagined-umbrella)
-[![](https://img.shields.io/librariesio/release/npm/reimagined-umbrella)](https://www.npmjs.com/package/reimagined-umbrella)
+[![](https://img.shields.io/librariesio/release/npm/reimagined-umbrella)](https://github.com/leonrinkel/reimagined-umbrella/network/dependencies)
 [![](https://img.shields.io/github/issues/leonrinkel/reimagined-umbrella)](https://github.com/leonrinkel/reimagined-umbrella/issues)
 [![](https://img.shields.io/github/license/leonrinkel/reimagined-umbrella)](https://github.com/leonrinkel/reimagined-umbrella/blob/main/LICENSE)
 [![](https://img.shields.io/github/contributors/leonrinkel/reimagined-umbrella)](https://github.com/leonrinkel/reimagined-umbrella/graphs/contributors)
