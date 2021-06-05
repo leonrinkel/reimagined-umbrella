@@ -6,6 +6,7 @@ import {
     SubscriptionsResponse,
     TickerResponse
 } from "./coinbase-types";
+import { ReconnectingWebSocket } from "./reconnecting-ws";
 import { TimeReviver } from "./time-reviver";
 
 const DEFAULT_URL = "wss://ws-feed.pro.coinbase.com";
@@ -16,30 +17,24 @@ export declare interface CoinbaseWebSocket {
     on(event: "ticker", listener: (e: TickerResponse) => void): void;
 }
 
+export type CoinbaseWebSocketOptions = {
+    url?: string;
+    delay?: number;
+    maxAttempts?: number;
+};
+
 /**
- * Websocket wrapper with convenience functions for subscribing coinbase api
+ * WebSocket wrapper with convenience functions for subscribing Coinbase API
  * channels
  */
-export class CoinbaseWebSocket {
+export class CoinbaseWebSocket extends ReconnectingWebSocket {
 
-    private _url: string;
-    private _ws?: ws;
     private _events = new EventEmitter();
 
-    constructor(options?: { url?: string }) {
-        this._url = options?.url || DEFAULT_URL;
-    }
-
-    /**
-     * Opens a websocket connection
-     * @returns a promise that will be resolved when the connection succeeded
-     */
-    public open(): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
-            this._ws = new ws(this._url);
-            this._ws.on("message", (data) => this._onMessage(data));
-            this._ws.on("open", () => resolve());
-            this._ws.on("error", () => reject());
+    constructor(options?: CoinbaseWebSocketOptions) {
+        super({
+            ...options,
+            url: options?.url || DEFAULT_URL
         });
     }
 
@@ -108,13 +103,17 @@ export class CoinbaseWebSocket {
         this._events.on(event, listener);
     }
 
-    private _onMessage(data: ws.Data) {
+    protected _onMessage(data: ws.Data) {
         const message = JSON.parse(data.toString("utf-8"), TimeReviver);
         if (
             message.type === "subscriptions" ||
             message.type === "heartbeat" ||
             message.type === "ticker"
         ) this._events.emit(message.type, message);
+    }
+
+    protected _onReconnected(): void {
+        // TODO: resubscribe channels
     }
 
 }

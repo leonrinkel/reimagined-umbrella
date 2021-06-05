@@ -11,6 +11,7 @@ describe("CoinbaseWebSocket", () => {
 
     const port = 4269;
     const url = `ws://localhost:${port}`;
+    let cws: CoinbaseWebSocket;
     let wss: ws.Server;
 
     beforeEach(() => {
@@ -18,21 +19,8 @@ describe("CoinbaseWebSocket", () => {
     });
 
     afterEach(() => {
-        wss.close();
-    });
-
-    describe("#open()", () => {
-
-        it("should resolve if connection succeeds", () => {
-            const cws = new CoinbaseWebSocket({ url });
-            return cws.open().should.be.fulfilled;
-        });
-
-        it("should reject if connection fails", () => {
-            const cws = new CoinbaseWebSocket({ url: "ws://localhost:12345"});
-            return cws.open().should.be.rejected;
-        });
-
+        if (cws) cws.close();
+        if (wss) wss.close();
     });
 
     describe("#subscribe()", () => {
@@ -53,7 +41,7 @@ describe("CoinbaseWebSocket", () => {
                     done();
                 }));
 
-            const cws = new CoinbaseWebSocket({ url });
+            cws = new CoinbaseWebSocket({ url });
             cws.open().then(() => cws.subscribe(request));
         });
 
@@ -79,7 +67,7 @@ describe("CoinbaseWebSocket", () => {
                     socket.send(JSON.stringify(response));
                 }));
 
-            const cws = new CoinbaseWebSocket({ url });
+            cws = new CoinbaseWebSocket({ url });
             return cws.open().then(() => cws.subscribe(request)).should.be.fulfilled;
         });
 
@@ -104,7 +92,7 @@ describe("CoinbaseWebSocket", () => {
                     socket.send(JSON.stringify(response));
                 }));
 
-            const cws = new CoinbaseWebSocket({ url });
+            cws = new CoinbaseWebSocket({ url });
             return cws.open().then(() => cws.subscribe(request)).should.be.rejected;
         });
 
@@ -130,7 +118,7 @@ describe("CoinbaseWebSocket", () => {
                     socket.send(JSON.stringify(response));
                 }));
 
-            const cws = new CoinbaseWebSocket({ url });
+            cws = new CoinbaseWebSocket({ url });
             return cws.open().then(() => cws.subscribe(request)).should.be.rejected;
         });
 
@@ -150,7 +138,7 @@ describe("CoinbaseWebSocket", () => {
             wss.once("connection", (socket) =>
                 socket.send(JSON.stringify(message)));
 
-            const cws = new CoinbaseWebSocket({ url });
+            cws = new CoinbaseWebSocket({ url });
             return new Promise<void>((resolve, reject) => {
                 cws.on("subscriptions", (e) => {
                     if (JSON.stringify(e) === JSON.stringify(message))
@@ -173,7 +161,7 @@ describe("CoinbaseWebSocket", () => {
             wss.once("connection", (socket) =>
                 socket.send(JSON.stringify(message)));
 
-            const cws = new CoinbaseWebSocket({ url });
+            cws = new CoinbaseWebSocket({ url });
             return new Promise<void>((resolve, reject) => {
                 cws.on("heartbeat", (e) => {
                     if (JSON.stringify(e) === JSON.stringify(message))
@@ -206,7 +194,7 @@ describe("CoinbaseWebSocket", () => {
             wss.once("connection", (socket) =>
                 socket.send(JSON.stringify(message)));
 
-            const cws = new CoinbaseWebSocket({ url });
+            cws = new CoinbaseWebSocket({ url });
             return new Promise<void>((resolve, reject) => {
                 cws.on("ticker", (e) => {
                     if (JSON.stringify(e) === JSON.stringify(message))
@@ -236,7 +224,7 @@ describe("CoinbaseWebSocket", () => {
                     done();
                 }));
 
-            const cws = new CoinbaseWebSocket({ url });
+            cws = new CoinbaseWebSocket({ url });
             cws.open().then(() => cws.subscribeHeartbeat("ETH-USD", "ETH-EUR"));
         });
 
@@ -259,7 +247,7 @@ describe("CoinbaseWebSocket", () => {
                     done();
                 }));
 
-            const cws = new CoinbaseWebSocket({ url });
+            cws = new CoinbaseWebSocket({ url });
             cws.open().then(() => cws.subscribeTicker("ETH-USD", "ETH-EUR"));
         });
 
