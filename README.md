@@ -6,7 +6,8 @@
 [![](https://img.shields.io/github/license/leonrinkel/reimagined-umbrella)](https://github.com/leonrinkel/reimagined-umbrella/blob/main/LICENSE)
 [![](https://img.shields.io/github/contributors/leonrinkel/reimagined-umbrella)](https://github.com/leonrinkel/reimagined-umbrella/graphs/contributors)
 [![](https://img.shields.io/github/workflow/status/leonrinkel/reimagined-umbrella/Node.js%20CI/main)](https://github.com/leonrinkel/reimagined-umbrella/actions/workflows/node.js.yml)
-[![](https://img.shields.io/github/workflow/status/leonrinkel/reimagined-umbrella/CodeQL/main?label=CodeQL)](https://github.com/leonrinkel/reimagined-umbrella/security/code-scanning)
+[![](https://img.shields.io/github/workflow/status/leonrinkel/reimagined-umbrella/CodeQL/main?label=CodeQL&logo=github)](https://github.com/leonrinkel/reimagined-umbrella/security/code-scanning)
+[![](https://img.shields.io/github/workflow/status/leonrinkel/reimagined-umbrella/Docker/main?logo=docker)](https://github.com/users/leonrinkel/packages/container/package/reimagined-umbrella)
 
 A simple Node.js® project that subscribes to the Coinbase WebSocket API and streams ticker data into InfluxDB.
 
