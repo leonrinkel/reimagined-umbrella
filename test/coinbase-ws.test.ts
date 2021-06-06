@@ -253,4 +253,67 @@ describe("CoinbaseWebSocket", () => {
 
     });
 
+    describe("#_onReconnected()", () => {
+
+        it("should send a subscribe request for previously connected channels", (done) => {
+            cws = new CoinbaseWebSocket({ url, delay: 1 });
+
+            let connection: ws;
+            let subscribeRequest: any;
+            wss.once("connection", (_connection) => {
+                connection = _connection;
+                connection.once("message", (data) => {
+                    subscribeRequest = JSON.parse(data.toString("utf-8"));
+                    connection.send(
+                        JSON.stringify({ ...subscribeRequest, type: "subscriptions" }));
+                });
+            });
+
+            cws
+                .open()
+                .then(() => cws.subscribeHeartbeat("ETH-USD"))
+                .then(() => {
+                    wss.once("connection", (connection) => {
+                        connection.once("message", (data) => {
+                            const resubscribeRequest = JSON.parse(data.toString("utf-8"));
+                            expect(resubscribeRequest).to.deep.equal(subscribeRequest);
+                            done();
+                        });
+                    });
+
+                    setTimeout(() => connection.close());
+                });
+        });
+
+        it("should close connection when resubscribe fails", (done) => {
+            cws = new CoinbaseWebSocket({ url, delay: 1 });
+
+            let connection: ws;
+            wss.once("connection", (_connection) => {
+                connection = _connection;
+                connection.once("message", (data) => {
+                    const subscribeRequest = JSON.parse(data.toString("utf-8"));
+                    connection.send(
+                        JSON.stringify({ ...subscribeRequest, type: "subscriptions" }));
+                });
+            });
+
+            cws
+                .open()
+                .then(() => cws.subscribeHeartbeat("ETH-USD"))
+                .then(() => {
+                    wss.once("connection", (connection) => {
+                        connection.once("message", () => {
+                            connection.send(
+                                JSON.stringify({ type: "subscriptions", channels: [] }));
+                        });
+                        connection.once("close", () => done());
+                    });
+
+                    setTimeout(() => connection.close());
+                });
+        });
+
+    });
+
 });

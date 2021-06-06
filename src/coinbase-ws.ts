@@ -1,6 +1,7 @@
 import EventEmitter from "events";
 import ws from "ws";
 import {
+    Channel,
     HeartbeatResponse,
     SubscribeRequest,
     SubscriptionsResponse,
@@ -30,6 +31,7 @@ export type CoinbaseWebSocketOptions = {
 export class CoinbaseWebSocket extends ReconnectingWebSocket {
 
     private _events = new EventEmitter();
+    private _channels: Channel[] = [];
 
     constructor(options?: CoinbaseWebSocketOptions) {
         super({
@@ -61,7 +63,10 @@ export class CoinbaseWebSocket extends ReconnectingWebSocket {
                             channel.product_ids.includes(requested_product_id));
                     });
 
-                if (subscriptionSuccessful) resolve();
+                if (subscriptionSuccessful) {
+                    this._channels.push(...request.channels);
+                    resolve();
+                }
                 else reject(new Error("subscription failed"));
             };
             this._events.on("subscriptions", listener);
@@ -113,7 +118,12 @@ export class CoinbaseWebSocket extends ReconnectingWebSocket {
     }
 
     protected _onReconnected(): void {
-        // TODO: resubscribe channels
+        this
+            .subscribe({
+                type: "subscribe",
+                channels: this._channels
+            })
+            .catch(() => this.close());
     }
 
 }
