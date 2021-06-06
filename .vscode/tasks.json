@@ -17,7 +17,7 @@
             "group": "test",
             "problemMatcher": [],
             "label": "npm: test",
-            "detail": "mocha -r ts-node/register 'test/**/*.test.ts'"
+            "detail": "mocha 'dist/test/**/*.test.js'"
         }
     ]
 }
