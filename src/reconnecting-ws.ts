@@ -1,7 +1,7 @@
 import ws from "ws";
 
 const DEFAULT_DELAY = 1_000 /* ms */;
-const DEFAULT_MAX_ATTEMPTS = 10;
+const DEFAULT_MAX_ATTEMPTS = 60;
 
 export type ReconnectingWebSocketOptions = {
     url: string;
