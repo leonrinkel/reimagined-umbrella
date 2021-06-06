@@ -24,6 +24,7 @@ describe("ReconnectingWebSocket", () => {
     });
 
     afterEach(() => {
+        sinon.restore();
         if (trws) trws.close();
         if (wss) wss.close();
     });
