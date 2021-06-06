@@ -34,10 +34,7 @@ export abstract class ReconnectingWebSocket {
             this._ws = new ws(this._url);
             this._ws.on("message", (data) => this._onMessage(data));
             this._ws.on("open", () => {
-                this._ws!.once("close", () => this
-                    .reconnect()
-                    .then(() => this._onReconnected())
-                );
+                this._ws!.once("close", () => this.reconnect());
                 resolve();
             });
             this._ws.on("error", () => reject());
@@ -78,7 +75,10 @@ export abstract class ReconnectingWebSocket {
         setTimeout(() => {
             this
                 .open()
-                .then(() => resolve())
+                .then(() => {
+                    setTimeout(() => this._onReconnected());
+                    resolve();
+                })
                 .catch(() => this._reconnect(attempt + 1, resolve, reject));
         }, this._delay);
     }
