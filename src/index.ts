@@ -66,7 +66,7 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
         "opening influx write api\n" +
         util.inspect(
             { influxUrl, influxOrg, influxBucket, influxFlushInterval },
-            { compact: true }
+            { compact: true, colors: true }
         )
     );
 

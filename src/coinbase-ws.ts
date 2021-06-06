@@ -49,7 +49,7 @@ export class CoinbaseWebSocket extends ReconnectingWebSocket {
                 this._events.on(event, (e) =>
                     this._logger?.debug(
                         `received ${event} response\n` +
-                        util.inspect(e, { compact: true })
+                        util.inspect(e, { compact: true, colors: true })
                     )
                 );
             }
@@ -67,7 +67,7 @@ export class CoinbaseWebSocket extends ReconnectingWebSocket {
             this._ws?.send(JSON.stringify(request));
             this._logger?.debug(
                 "sent subscribe request\n" +
-                util.inspect(request, { compact: true })
+                util.inspect(request, { compact: true, colors: true })
             );
 
             const listener = (e: SubscriptionsResponse) => {
