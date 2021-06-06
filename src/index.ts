@@ -1,5 +1,7 @@
 import { InfluxDB, Point } from "@influxdata/influxdb-client";
 import process from "process";
+import util from "util";
+import winston from "winston";
 import { CoinbaseWebSocket } from "./coinbase-ws";
 
 // default values for env variable options
@@ -27,6 +29,15 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
 
 (async () => {
 
+    const logger = winston.createLogger({
+        level: process.env.LOG_LEVEL || "info",
+        format: winston.format.combine(
+            winston.format.colorize(),
+            winston.format.simple()
+        ),
+        transports: [ new winston.transports.Console() ]
+    });
+
     // read env variable options
 
     const influxUrl = process.env.INFLUX_URL || DEFAULT_INFLUX_URL;
@@ -39,19 +50,25 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
 
     const influxToken = process.env.INFLUX_TOKEN;
     if (!influxToken) {
-        process.stderr.write(
-            "INFLUX_TOKEN environment variable has to be specified");
+        logger.error("INFLUX_TOKEN environment variable has to be specified");
         process.exit(1);
     }
 
     const productIds = process.env.PRODUCT_IDS; // comma separated list
     if (!productIds) {
-        process.stderr.write(
-            "PRODUCT_IDS environment variable has to be specified");
+        logger.error("PRODUCT_IDS environment variable has to be specified");
         process.exit(1);
     }
 
     // open a new influx write api
+
+    logger.info(
+        "opening influx write api\n" +
+        util.inspect(
+            { influxUrl, influxOrg, influxBucket, influxFlushInterval },
+            { compact: true }
+        )
+    );
 
     const influx = new InfluxDB({ url: influxUrl, token: influxToken });
     const writeApi = influx.getWriteApi(
@@ -61,7 +78,7 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
 
     // create a new coinbase socket and register event listeners
 
-    const coinbase = new CoinbaseWebSocket();
+    const coinbase = new CoinbaseWebSocket({ logger });
 
     let lastHeartbeat = new Date();
     coinbase.on("heartbeat", (heartbeat) => {
@@ -88,20 +105,45 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
     });
 
     // open connection and subscribe to channels
-    await coinbase.open();
-    await coinbase.subscribeHeartbeat(...productIds.split(","));
-    await coinbase.subscribeTicker(...productIds.split(","));
+
+    await coinbase
+        .open()
+        .then(() => logger.info("successfully connected to coinbase"))
+        .catch(() => {
+            logger.error("unable to connect to coinbase, exiting...");
+            process.exit(1);
+        });
+
+    await coinbase
+        .subscribeHeartbeat(...productIds.split(","))
+        .then(() => logger.info("successfully subscribed to heartbeat channels"))
+        .catch(() => {
+            logger.info("unable to subscribe to heartbeat channels, exiting...");
+            process.exit(1);
+        });
+
+    await coinbase
+        .subscribeTicker(...productIds.split(","))
+        .then(() => logger.info("successfully subscribed to ticker channels"))
+        .catch(() => {
+            logger.info("unable to subscribe to ticker channels, exiting...");
+            process.exit(1);
+        });
 
     // monitor heartbeats
     setInterval(() => {
-        if (lastHeartbeat.getTime() < Date.now() - TIMEOUT_INTERVAL)
+        if (lastHeartbeat.getTime() < Date.now() - TIMEOUT_INTERVAL) {
+            logger.warn("received no heartbeats for more than " +
+                `${TIMEOUT_INTERVAL} ms, trying to reconnect...`);
+
             coinbase
                 .reconnect()
+                .then(() => logger.info("successfully reconnected"))
                 .catch(() => {
-                    process.stderr.write(
-                        `received no heartbeats for more than ${TIMEOUT_INTERVAL} ms`);
+                    logger.error("unable to reconnect, exiting...");
                     process.exit(1);
                 });
+        }
     }, TIMEOUT_INTERVAL);
 
 })();

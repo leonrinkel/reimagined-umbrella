@@ -1,4 +1,6 @@
 import EventEmitter from "events";
+import util from "util";
+import { Logger } from "winston";
 import ws from "ws";
 import {
     Channel,
@@ -22,6 +24,7 @@ export type CoinbaseWebSocketOptions = {
     url?: string;
     delay?: number;
     maxAttempts?: number;
+    logger?: Logger;
 };
 
 /**
@@ -30,6 +33,7 @@ export type CoinbaseWebSocketOptions = {
  */
 export class CoinbaseWebSocket extends ReconnectingWebSocket {
 
+    private _logger?: Logger;
     private _events = new EventEmitter();
     private _channels: Channel[] = [];
 
@@ -38,6 +42,18 @@ export class CoinbaseWebSocket extends ReconnectingWebSocket {
             ...options,
             url: options?.url || DEFAULT_URL
         });
+
+        this._logger = options?.logger;
+        if (this._logger) {
+            for (const event of [ "subscriptions", "heartbeat", "ticker" ]) {
+                this._events.on(event, (e) =>
+                    this._logger?.debug(
+                        `received ${event} response\n` +
+                        util.inspect(e, { compact: true })
+                    )
+                );
+            }
+        }
     }
 
     /**
@@ -49,6 +65,10 @@ export class CoinbaseWebSocket extends ReconnectingWebSocket {
     public subscribe(request: SubscribeRequest): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             this._ws?.send(JSON.stringify(request));
+            this._logger?.debug(
+                "sent subscribe request\n" +
+                util.inspect(request, { compact: true })
+            );
 
             const listener = (e: SubscriptionsResponse) => {
                 this._events.removeListener("subscriptions", listener);
@@ -118,12 +138,17 @@ export class CoinbaseWebSocket extends ReconnectingWebSocket {
     }
 
     protected _onReconnected(): void {
+        this._logger?.info("reconnected, trying to resubscribe...");
         this
             .subscribe({
                 type: "subscribe",
                 channels: this._channels
             })
-            .catch(() => this.close());
+            .then(() => this._logger?.info("successfully resubscribed"))
+            .catch(() => {
+                this._logger?.error("resubscription failed, closing socket...");
+                this.close();
+            });
     }
 
 }
