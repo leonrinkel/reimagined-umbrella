@@ -94,11 +94,14 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
 
     // monitor heartbeats
     setInterval(() => {
-        if (lastHeartbeat.getTime() < Date.now() - TIMEOUT_INTERVAL) {
-            process.stderr.write(
-                `received no heartbeats for more than ${TIMEOUT_INTERVAL} ms`);
-            process.exit(1);
-        }
+        if (lastHeartbeat.getTime() < Date.now() - TIMEOUT_INTERVAL)
+            coinbase
+                .reconnect()
+                .catch(() => {
+                    process.stderr.write(
+                        `received no heartbeats for more than ${TIMEOUT_INTERVAL} ms`);
+                    process.exit(1);
+                });
     }, TIMEOUT_INTERVAL);
 
 })();
