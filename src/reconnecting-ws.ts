@@ -37,7 +37,8 @@ export abstract class ReconnectingWebSocket {
                 this._ws!.once("close", () => this.reconnect());
                 resolve();
             });
-            this._ws.on("error", () => reject());
+            this._ws.on("error", () =>
+                reject(new Error("unable to open WebSocket connection")));
         });
     }
 
@@ -69,9 +70,11 @@ export abstract class ReconnectingWebSocket {
     private _reconnect(
         attempt: number,
         resolve: () => void,
-        reject: () => void
+        reject: (err: Error) => void
     ): void {
-        if (attempt > this._maxAttempts) return reject();
+        if (attempt > this._maxAttempts)
+            return reject(new Error("max reconnection attempts reached"));
+
         setTimeout(() => {
             this
                 .open()
