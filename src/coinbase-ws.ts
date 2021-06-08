@@ -33,7 +33,6 @@ export type CoinbaseWebSocketOptions = {
  */
 export class CoinbaseWebSocket extends ReconnectingWebSocket {
 
-    private _logger?: Logger;
     private _events = new EventEmitter();
     private _channels: Channel[] = [];
 
@@ -43,7 +42,6 @@ export class CoinbaseWebSocket extends ReconnectingWebSocket {
             url: options?.url || DEFAULT_URL
         });
 
-        this._logger = options?.logger;
         if (this._logger) {
             for (const event of [ "subscriptions", "heartbeat", "ticker" ]) {
                 this._events.on(event, (e) =>

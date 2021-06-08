@@ -1,3 +1,4 @@
+import { Logger } from "winston";
 import ws from "ws";
 
 const DEFAULT_DELAY = 1_000 /* ms */;
@@ -7,6 +8,7 @@ export type ReconnectingWebSocketOptions = {
     url: string;
     delay?: number;
     maxAttempts?: number;
+    logger?: Logger;
 };
 
 /**
@@ -17,12 +19,15 @@ export abstract class ReconnectingWebSocket {
     private _url: string;
     private _delay: number;
     private _maxAttempts: number;
+
+    protected _logger?: Logger;
     protected _ws?: ws;
 
     constructor(options: ReconnectingWebSocketOptions) {
         this._url = options.url;
         this._delay = options.delay || DEFAULT_DELAY;
         this._maxAttempts = options.maxAttempts || DEFAULT_MAX_ATTEMPTS;
+        this._logger = options.logger;
     }
 
     /**
@@ -34,7 +39,12 @@ export abstract class ReconnectingWebSocket {
             this._ws = new ws(this._url);
             this._ws.on("message", (data) => this._onMessage(data));
             this._ws.on("open", () => {
-                this._ws!.once("close", () => this.reconnect());
+                this._ws!.once("close", () => {
+                    this._logger?.warn(
+                        "socket has been closed, trying to reconnect...");
+                    this.reconnect();
+                });
+
                 resolve();
             });
             this._ws.on("error", () =>
