@@ -142,16 +142,20 @@ class ReconnectingWebSocketConnectingState
         );
     }
 
-    public override onWebSocketOpen() {
+    private cleanUpListeners() {
         this.instance.context.webSocket!
             .removeListener("open", this.onOpenListener!);
         this.instance.context.webSocket!
             .removeListener("error", this.onErrorListener!);
+    }
 
+    public override onWebSocketOpen() {
+        this.cleanUpListeners();
         return new ReconnectingWebSocketConnectedState(this.instance);
     }
 
     public override onWebSocketError() {
+        this.cleanUpListeners();
         return new ReconnectingWebSocketIdleState(this.instance);
     }
 
@@ -181,17 +185,18 @@ class ReconnectingWebSocketConnectedState
         );
     }
 
-    public override onWebSocketClose() {
+    private cleanUpListeners() {
         this.instance.context.webSocket
             ?.removeListener("close", this.onCloseListener!);
+    }
 
+    public override onWebSocketClose() {
+        this.cleanUpListeners();
         return new ReconnectingWebSocketDisconnectedState(this.instance);
     }
 
     public override subscribe(request: SubscribeRequest) {
-        this.instance.context.webSocket
-            ?.removeListener("close", this.onCloseListener!);
-
+        this.cleanUpListeners();
         return new ReconnectingWebSocketSubscribingState(this.instance, request);
     }
 
@@ -258,20 +263,20 @@ class ReconnectingWebSocketReconnectingState
         );
     }
 
-    public override onWebSocketOpen() {
+    private cleanUpListeners() {
         this.instance.context.webSocket!
             .removeListener("open", this.onOpenListener!);
         this.instance.context.webSocket!
             .removeListener("error", this.onErrorListener!);
+    }
 
+    public override onWebSocketOpen() {
+        this.cleanUpListeners();
         return new ReconnectingWebSocketReconnectedState(this.instance);
     }
 
     public override onWebSocketError() {
-        this.instance.context.webSocket!
-            .removeListener("open", this.onOpenListener!);
-        this.instance.context.webSocket!
-            .removeListener("error", this.onErrorListener!);
+        this.cleanUpListeners();
 
         if (
             this.instance.context.reconnectTries! <
@@ -306,10 +311,13 @@ class ReconnectingWebSocketReconnectedState
         );
     }
 
-    public override onWebSocketClose() {
+    private cleanUpListeners() {
         this.instance.context.webSocket!
             .removeListener("close", this.onCloseListener!);
+    }
 
+    public override onWebSocketClose() {
+        this.cleanUpListeners();
         return new ReconnectingWebSocketDisconnectedState(this.instance);
     }
 
@@ -398,31 +406,26 @@ class ReconnectingWebSocketSubscribingState
             .send(JSON.stringify(this.request));
     }
 
-    public override onWebSocketClose() {
+    private cleanUpListeners() {
         this.instance.context.webSocket!
             .removeListener("close", this.onCloseListener!);
         this.instance.context.webSocket!
             .removeListener("message", this.onMessageListener!);
+    }
 
+    public override onWebSocketClose() {
+        this.cleanUpListeners();
         return new ReconnectingWebSocketDisconnectedState(this.instance);
     }
 
     public override onSubscribed(response: SubscriptionsResponse) {
-        this.instance.context.webSocket!
-            .removeListener("close", this.onCloseListener!);
-        this.instance.context.webSocket!
-            .removeListener("message", this.onMessageListener!);
-
+        this.cleanUpListeners(),
         this.instance.context.subscribedChannels = response.channels;
         return new ReconnectingWebSocketSubscribedState(this.instance);
     }
 
     public override onSubscriptionFailed() {
-        this.instance.context.webSocket!
-            .removeListener("close", this.onCloseListener!);
-        this.instance.context.webSocket!
-            .removeListener("message", this.onMessageListener!);
-
+        this.cleanUpListeners();
         return new ReconnectingWebSocketFailedState(this.instance);
     }
 
@@ -452,10 +455,13 @@ class ReconnectingWebSocketSubscribedState
         );
     }
 
-    public override onWebSocketClose() {
+    private cleanUpListeners() {
         this.instance.context.webSocket!
             .removeListener("close", this.onCloseListener!);
+    }
 
+    public override onWebSocketClose() {
+        this.cleanUpListeners();
         return new ReconnectingWebSocketDisconnectedState(this.instance);
     }
 
