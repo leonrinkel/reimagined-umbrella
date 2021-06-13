@@ -24,9 +24,6 @@ const MEASUREMENT_FIELD_BEST_BID = "best_bid";
 const MEASUREMENT_FIELD_BEST_ASK = "best_ask";
 const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
 
-// the program will timeout if no heartbeat events have been received
-const TIMEOUT_INTERVAL = 10_000 /* ms */;
-
 (async () => {
 
     const logger = winston.createLogger({
@@ -78,14 +75,27 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
 
     // create a new coinbase socket and register event listeners
 
-    const coinbase = new CoinbaseWebSocket({ logger });
+    const coinbase = new CoinbaseWebSocket({
+        logger,
+        url: "wss://ws-feed.pro.coinbase.com", // TODO: make env option
+        reconnectDelay: 1000, // TODO: make env option
+        maxReconnectTries: 60, // TODO: make env option
+        timeoutInterval: 10000, // TODO: make env option
+    })
 
-    let lastHeartbeat = new Date();
-    coinbase.on("heartbeat", (heartbeat) => {
-        lastHeartbeat = heartbeat.time;
-    });
+    coinbase.on("heartbeat", (heartbeat) =>
+        logger.debug(
+            "received heartbeat\n" +
+            util.inspect(heartbeat, { compact: true, colors: true })
+        )
+    );
 
     coinbase.on("ticker", (ticker) => {
+        logger.debug(
+            "received ticker\n" +
+            util.inspect(ticker, { compact: true, colors: true })
+        );
+
         // create point and queue to write
         const point = new Point(MEASUREMENT_NAME);
         point
@@ -107,7 +117,7 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
     // open connection and subscribe to channels
 
     await coinbase
-        .open()
+        .connect()
         .then(() => logger.info("successfully connected to coinbase"))
         .catch(() => {
             logger.error("unable to connect to coinbase, exiting...");
@@ -115,35 +125,11 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
         });
 
     await coinbase
-        .subscribeHeartbeat(...productIds.split(","))
-        .then(() => logger.info("successfully subscribed to heartbeat channels"))
+        .subscribe(...productIds.split(","))
+        .then(() => logger.info("successfully subscribed to api channels"))
         .catch(() => {
-            logger.info("unable to subscribe to heartbeat channels, exiting...");
+            logger.info("unable to subscribe to api channels, exiting...");
             process.exit(1);
         });
-
-    await coinbase
-        .subscribeTicker(...productIds.split(","))
-        .then(() => logger.info("successfully subscribed to ticker channels"))
-        .catch(() => {
-            logger.info("unable to subscribe to ticker channels, exiting...");
-            process.exit(1);
-        });
-
-    // monitor heartbeats
-    setInterval(() => {
-        if (lastHeartbeat.getTime() < Date.now() - TIMEOUT_INTERVAL) {
-            logger.warn("received no heartbeats for more than " +
-                `${TIMEOUT_INTERVAL} ms, trying to reconnect...`);
-
-            coinbase
-                .reconnect()
-                .then(() => logger.info("successfully reconnected"))
-                .catch(() => {
-                    logger.error("unable to reconnect, exiting...");
-                    process.exit(1);
-                });
-        }
-    }, TIMEOUT_INTERVAL);
 
 })();
