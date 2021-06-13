@@ -300,6 +300,7 @@ class ReconnectingWebSocketReconnectedState
     extends ReconnectingWebSocketState {
 
     private onCloseListener?: () => void;
+    private transitionTimeout?: NodeJS.Timeout;
 
     public get name(): ReconnectingWebSocketStateName {
         return "Reconnected";
@@ -310,8 +311,8 @@ class ReconnectingWebSocketReconnectedState
             () => this.instance.transition("onWebSocketClose");
         this.instance.context.webSocket!.on("close", this.onCloseListener);
 
-        setTimeout(() => this.instance.transition(
-            "subscribe", this.instance.context.productIds));
+        this.transitionTimeout = setTimeout(() => this.instance
+            .transition("subscribe", this.instance.context.productIds));
 
         // TODO: remove
         this.instance.options.logger?.debug(
@@ -326,6 +327,7 @@ class ReconnectingWebSocketReconnectedState
     private cleanUpListeners() {
         this.instance.context.webSocket!
             .removeListener("close", this.onCloseListener!);
+        clearTimeout(this.transitionTimeout!);
     }
 
     public override onWebSocketClose() {
@@ -489,7 +491,7 @@ class ReconnectingWebSocketSubscribedState
         this.instance.context.webSocket!.on("close", this.onCloseListener);
         this.instance.context.webSocket!.on("message", this.onMessageListener);
 
-        setInterval(
+        this.heartbeatCheckInterval = setInterval(
             () => {
                 if (
                     this.lastHeartbeat &&
@@ -533,11 +535,47 @@ class ReconnectingWebSocketSubscribedState
 class ReconnectingWebSocketTimeoutedState
     extends ReconnectingWebSocketState {
 
+    private onCloseListener?: () => void;
+    private reconnectTimeout?: NodeJS.Timeout;
+
     public get name(): ReconnectingWebSocketStateName {
         return "Timeouted";
     }
 
-    public handle(): void {}
+    public handle(): void {
+        this.onCloseListener =
+            () => this.instance.transition("onWebSocketClose");
+        this.instance.context.webSocket!.on("close", this.onCloseListener);
+
+        this.reconnectTimeout =
+            setTimeout(() => this.instance.transition("reconnect"));
+
+        // TODO: remove
+        this.instance.options.logger?.debug(
+            util.inspect({
+                listenerCounts: {
+                    close: this.instance.context.webSocket!.listenerCount("close"),
+                },
+            }, { compact: true, colors: true })
+        );
+    }
+
+    private cleanUpListeners() {
+        this.instance.context.webSocket!
+            .removeListener("close", this.onCloseListener!);
+        clearTimeout(this.reconnectTimeout!);
+    }
+
+    public override onWebSocketClose() {
+        this.cleanUpListeners();
+        return new ReconnectingWebSocketDisconnectedState(this.instance);
+    }
+
+    public override reconnect() {
+        this.cleanUpListeners();
+        this.instance.context.reconnectTries = 0;
+        return new ReconnectingWebSocketReconnectingState(this.instance);
+    }
 
 }
 
