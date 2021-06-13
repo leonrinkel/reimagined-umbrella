@@ -3,9 +3,12 @@ import util from "util";
 import winston from "winston";
 import ws from "ws";
 import {
-    Channel, SubscribeRequest,
-    SubscriptionsResponse
+    HeartbeatResponse,
+    SubscribeRequest,
+    SubscriptionsResponse,
+    TickerResponse
 } from "./coinbase-types";
+import { TimeReviver } from "./time-reviver";
 
 type ReconnectingWebSocketOperationNames =
     "connect" |
@@ -90,6 +93,10 @@ abstract class ReconnectingWebSocketState
     }
 
     public onSubscriptionFailed(...args: any): ReconnectingWebSocketState {
+        throw new Error("Unsupported Operation.");
+    }
+
+    public onHeartbeatTimeout(...args: any): ReconnectingWebSocketState {
         throw new Error("Unsupported Operation.");
     }
 
@@ -464,7 +471,13 @@ class ReconnectingWebSocketSubscribedState
         this.onCloseListener =
             () => this.instance.transition("onWebSocketClose");
         this.onMessageListener =
-            (data: ws.Data) => console.log(data.toString("utf-8"));
+            (data: ws.Data) => {
+                const message = JSON.parse(data.toString("utf-8"), TimeReviver);
+                if (message.type === "heartbeat")
+                    this.instance.events.emit("heartbeat", message);
+                else if (message.type === "ticker")
+                    this.instance.events.emit("ticker", message);
+            };
 
         this.instance.context.webSocket!.on("close", this.onCloseListener);
         this.instance.context.webSocket!.on("message", this.onMessageListener);
@@ -506,14 +519,12 @@ class ReconnectingWebSocketInternals {
     public options: ReconnectingWebSocketOptions;
     public context: ReconnectingWebSocketContext;
     public state: ReconnectingWebSocketState;
-
-    private events: EventEmitter;
+    public events: EventEmitter;
 
     constructor(options: ReconnectingWebSocketOptions) {
         this.options = options;
         this.context = {};
         this.state = new ReconnectingWebSocketIdleState(this);
-
         this.events = new EventEmitter();
     }
 
@@ -534,18 +545,46 @@ class ReconnectingWebSocketInternals {
     }
 
     public on(
-        event: ReconnectingWebSocketInternalsEvent,
+        event:
+            ReconnectingWebSocketInternalsEvent |
+            "heartbeat" | "ticker",
         listener: () => void
     ): void {
         this.events.on(event, listener);
     }
 
     public once(
-        event: ReconnectingWebSocketInternalsEvent,
+        event:
+            ReconnectingWebSocketInternalsEvent |
+            "heartbeat" | "ticker",
         listener: () => void
     ): void {
         this.events.once(event, listener);
     }
+
+}
+
+export declare interface ReconnectingWebSocket {
+
+    on(
+        event: "heartbeat",
+        listener: (e: HeartbeatResponse) => void
+    ): void;
+
+    on(
+        event: "ticker",
+        listener: (e: TickerResponse) => void
+    ): void;
+
+    once(
+        event: "heartbeat",
+        listener: (e: HeartbeatResponse) => void
+    ): void;
+
+    once(
+        event: "ticker",
+        listener: (e: TickerResponse) => void
+    ): void;
 
 }
 
@@ -591,6 +630,20 @@ export class ReconnectingWebSocket {
         });
     }
 
+    public on(
+        event: "heartbeat" | "ticker",
+        listener: (...args: any) => void
+    ): void {
+        this.internals.events.on(event, listener);
+    }
+
+    public once(
+        event: "heartbeat" | "ticker",
+        listener: (...args: any) => void
+    ): void {
+        this.internals.events.once(event, listener);
+    }
+
 }
 
 (async () => {
@@ -610,6 +663,12 @@ export class ReconnectingWebSocket {
         reconnectDelay: 1000,
         maxReconnectTries: 60,
     });
+
+    socket.on("heartbeat", (e) =>
+        logger.debug(util.inspect(e, { compact: true, colors: true })));
+    socket.on("ticker", (e) =>
+        logger.debug(util.inspect(e, { compact: true, colors: true })));
+
     await socket.connect();
     await socket.subscribe("ETH-USD", "DAI-USD");
 
