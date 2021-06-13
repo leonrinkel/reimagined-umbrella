@@ -1,17 +1,30 @@
 import { EventEmitter } from "events";
+import util from "util";
+import winston from "winston";
 import ws from "ws";
+import {
+    Channel, SubscribeRequest,
+    SubscriptionsResponse
+} from "./coinbase-types";
 
 type ReconnectingWebSocketOperationNames =
-    "connect" | "reconnect";
+    "connect" |
+    "reconnect" |
+    "subscribe";
 type ReconnectingWebSocketOperations =
-    Record<ReconnectingWebSocketOperationNames, () => void>;
+    Record<ReconnectingWebSocketOperationNames, (...args: any) => void>;
 
 type ReconnectingWebSocketEventNames =
-    "onWebSocketOpen" | "onWebSocketError" | "onWebSocketClose";
+    "onWebSocketOpen" |
+    "onWebSocketError" |
+    "onWebSocketClose" |
+    "onSubscribed" |
+    "onSubscriptionFailed";
 type ReconnectingWebSocketEvents =
-    Record<ReconnectingWebSocketEventNames, () => void>;
+    Record<ReconnectingWebSocketEventNames, (...args: any) => void>;
 
 type ReconnectingWebSocketOptions = {
+    logger?: winston.Logger;
     url: string;
     reconnectDelay: number;
     maxReconnectTries: number;
@@ -20,6 +33,7 @@ type ReconnectingWebSocketOptions = {
 type ReconnectingWebSocketContext = {
     webSocket?: ws;
     reconnectTries?: number;
+    subscribedChannels?: Channel[];
 };
 
 type ReconnectingWebSocketStateName =
@@ -30,7 +44,9 @@ type ReconnectingWebSocketStateName =
     "Disconnected" |
     "Reconnecting" |
     "Reconnected" |
-    "WaitingToReconnect";
+    "WaitingToReconnect" |
+    "Subscribing" |
+    "Subscribed";
 
 abstract class ReconnectingWebSocketState
     implements ReconnectingWebSocketOperations, ReconnectingWebSocketEvents {
@@ -45,23 +61,35 @@ abstract class ReconnectingWebSocketState
 
     public abstract handle(): void;
 
-    public connect(): ReconnectingWebSocketState {
+    public connect(...args: any): ReconnectingWebSocketState {
         throw new Error("Unsupported Operation.");
     }
 
-    public reconnect(): ReconnectingWebSocketState {
+    public reconnect(...args: any): ReconnectingWebSocketState {
         throw new Error("Unsupported Operation.");
     }
 
-    public onWebSocketOpen(): ReconnectingWebSocketState {
+    public subscribe(...args: any): ReconnectingWebSocketState {
         throw new Error("Unsupported Operation.");
     }
 
-    public onWebSocketError(): ReconnectingWebSocketState {
+    public onWebSocketOpen(...args: any): ReconnectingWebSocketState {
         throw new Error("Unsupported Operation.");
     }
 
-    public onWebSocketClose(): ReconnectingWebSocketState {
+    public onWebSocketError(...args: any): ReconnectingWebSocketState {
+        throw new Error("Unsupported Operation.");
+    }
+
+    public onWebSocketClose(...args: any): ReconnectingWebSocketState {
+        throw new Error("Unsupported Operation.");
+    }
+
+    public onSubscribed(...args: any): ReconnectingWebSocketState {
+        throw new Error("Unsupported Operation.");
+    }
+
+    public onSubscriptionFailed(...args: any): ReconnectingWebSocketState {
         throw new Error("Unsupported Operation.");
     }
 
@@ -76,7 +104,7 @@ class ReconnectingWebSocketIdleState
 
     public handle(): void {}
 
-    public override connect(): ReconnectingWebSocketConnectingState {
+    public override connect() {
         return new ReconnectingWebSocketConnectingState(this.instance);
     }
 
@@ -85,23 +113,45 @@ class ReconnectingWebSocketIdleState
 class ReconnectingWebSocketConnectingState
     extends ReconnectingWebSocketState {
 
+    private onOpenListener?: () => void;
+    private onErrorListener?: () => void;
+
     public get name(): ReconnectingWebSocketStateName {
         return "Connecting";
     }
 
     public handle(): void {
         this.instance.context.webSocket = new ws(this.instance.options.url);
-        this.instance.context.webSocket.once("open",
-            () => this.instance.onWebSocketOpen());
-        this.instance.context.webSocket.once("error",
-            () => this.instance.onWebSocketError());
+
+        this.onOpenListener =
+            () => this.instance.transition("onWebSocketOpen");
+        this.onErrorListener =
+            () => this.instance.transition("onWebSocketError");
+
+        this.instance.context.webSocket.on("open", this.onOpenListener);
+        this.instance.context.webSocket.on("error", this.onErrorListener);
+
+        // TODO: remove
+        this.instance.options.logger?.debug(
+            util.inspect({
+                listenerCounts: {
+                    open: this.instance.context.webSocket.listenerCount("open"),
+                    error: this.instance.context.webSocket.listenerCount("error"),
+                },
+            }, { compact: true, colors: true })
+        );
     }
 
-    public override onWebSocketOpen(): ReconnectingWebSocketConnectedState {
+    public override onWebSocketOpen() {
+        this.instance.context.webSocket!
+            .removeListener("open", this.onOpenListener!);
+        this.instance.context.webSocket!
+            .removeListener("error", this.onErrorListener!);
+
         return new ReconnectingWebSocketConnectedState(this.instance);
     }
 
-    public override onWebSocketError(): ReconnectingWebSocketIdleState {
+    public override onWebSocketError() {
         return new ReconnectingWebSocketIdleState(this.instance);
     }
 
@@ -110,17 +160,39 @@ class ReconnectingWebSocketConnectingState
 class ReconnectingWebSocketConnectedState
     extends ReconnectingWebSocketState {
 
+    private onCloseListener?: () => void;
+
     public get name(): ReconnectingWebSocketStateName {
         return "Connected";
     }
 
     public handle(): void {
-        this.instance.context.webSocket!.once("close",
-            () => this.instance.onWebSocketClose());
+        this.onCloseListener =
+            () => this.instance.transition("onWebSocketClose");
+        this.instance.context.webSocket!.on("close", this.onCloseListener);
+
+        // TODO: remove
+        this.instance.options.logger?.debug(
+            util.inspect({
+                listenerCounts: {
+                    close: this.instance.context.webSocket!.listenerCount("close"),
+                }
+            }, { compact: true, colors: true })
+        );
     }
 
-    public override onWebSocketClose(): ReconnectingWebSocketDisconnectedState {
+    public override onWebSocketClose() {
+        this.instance.context.webSocket
+            ?.removeListener("close", this.onCloseListener!);
+
         return new ReconnectingWebSocketDisconnectedState(this.instance);
+    }
+
+    public override subscribe(request: SubscribeRequest) {
+        this.instance.context.webSocket
+            ?.removeListener("close", this.onCloseListener!);
+
+        return new ReconnectingWebSocketSubscribingState(this.instance, request);
     }
 
 }
@@ -144,11 +216,11 @@ class ReconnectingWebSocketDisconnectedState
     }
 
     public handle(): void {
-        this.instance.context.reconnectTries = 0;
-        setTimeout(() => this.instance.reconnect());
+        setTimeout(() => this.instance.transition("reconnect"));
     }
 
-    public override reconnect(): ReconnectingWebSocketReconnectingState {
+    public override reconnect() {
+        this.instance.context.reconnectTries = 0;
         return new ReconnectingWebSocketReconnectingState(this.instance);
     }
 
@@ -157,26 +229,50 @@ class ReconnectingWebSocketDisconnectedState
 class ReconnectingWebSocketReconnectingState
     extends ReconnectingWebSocketState {
 
+    private onOpenListener?: () => void;
+    private onErrorListener?: () => void;
+
     public get name(): ReconnectingWebSocketStateName {
         return "Reconnecting";
     }
 
     public handle(): void {
-        this.instance.context.webSocket!.removeAllListeners();
         this.instance.context.webSocket = new ws(this.instance.options.url);
-        this.instance.context.webSocket.once("open",
-            () => this.instance.onWebSocketOpen());
-        this.instance.context.webSocket.once("error",
-            () => this.instance.onWebSocketError());
+
+        this.onOpenListener =
+            () => this.instance.transition("onWebSocketOpen");
+        this.onErrorListener =
+            () => this.instance.transition("onWebSocketError");
+
+        this.instance.context.webSocket.on("open", this.onOpenListener);
+        this.instance.context.webSocket.on("error", this.onErrorListener);
+
+        // TODO: remove
+        this.instance.options.logger?.debug(
+            util.inspect({
+                listenerCounts: {
+                    open: this.instance.context.webSocket!.listenerCount("open"),
+                    error: this.instance.context.webSocket!.listenerCount("error"),
+                },
+            }, { compact: true, colors: true })
+        );
     }
 
-    public override onWebSocketOpen(): ReconnectingWebSocketReconnectedState {
+    public override onWebSocketOpen() {
+        this.instance.context.webSocket!
+            .removeListener("open", this.onOpenListener!);
+        this.instance.context.webSocket!
+            .removeListener("error", this.onErrorListener!);
+
         return new ReconnectingWebSocketReconnectedState(this.instance);
     }
 
-    public override onWebSocketError():
-        ReconnectingWebSocketWaitingToReconnectState |
-        ReconnectingWebSocketFailedState {
+    public override onWebSocketError() {
+        this.instance.context.webSocket!
+            .removeListener("open", this.onOpenListener!);
+        this.instance.context.webSocket!
+            .removeListener("error", this.onErrorListener!);
+
         if (
             this.instance.context.reconnectTries! <
             this.instance.options.maxReconnectTries
@@ -189,16 +285,31 @@ class ReconnectingWebSocketReconnectingState
 class ReconnectingWebSocketReconnectedState
     extends ReconnectingWebSocketState {
 
+    private onCloseListener?: () => void;
+
     public get name(): ReconnectingWebSocketStateName {
         return "Reconnected";
     }
 
     public handle(): void {
-        this.instance.context.webSocket!.once("close",
-            () => this.instance.onWebSocketClose());
+        this.onCloseListener =
+            () => this.instance.transition("onWebSocketClose");
+        this.instance.context.webSocket!.on("close", this.onCloseListener);
+
+        // TODO: remove
+        this.instance.options.logger?.debug(
+            util.inspect({
+                listenerCounts: {
+                    close: this.instance.context.webSocket!.listenerCount("close"),
+                },
+            }, { compact: true, colors: true })
+        );
     }
 
-    public override onWebSocketClose(): ReconnectingWebSocketDisconnectedState {
+    public override onWebSocketClose() {
+        this.instance.context.webSocket!
+            .removeListener("close", this.onCloseListener!);
+
         return new ReconnectingWebSocketDisconnectedState(this.instance);
     }
 
@@ -212,15 +323,140 @@ class ReconnectingWebSocketWaitingToReconnectState
     }
 
     public handle(): void {
-        this.instance.context.reconnectTries! += 1;
         setTimeout(
-            () => this.instance.reconnect(),
+            () => this.instance.transition("reconnect"),
             this.instance.options.reconnectDelay
         );
     }
 
-    public override reconnect(): ReconnectingWebSocketReconnectingState {
+    public override reconnect() {
+        this.instance.context.reconnectTries! += 1;
         return new ReconnectingWebSocketReconnectingState(this.instance);
+    }
+
+}
+
+class ReconnectingWebSocketSubscribingState
+    extends ReconnectingWebSocketState {
+
+    private request: SubscribeRequest;
+
+    private onCloseListener?: () => void;
+    private onMessageListener?: (data: ws.Data) => void;
+
+    constructor(
+        instance: ReconnectingWebSocketInternals,
+        request: SubscribeRequest
+    ) {
+        super(instance);
+        this.request = request;
+    }
+
+    public get name(): ReconnectingWebSocketStateName {
+        return "Subscribing";
+    }
+
+    public handle(): void {
+        this.onCloseListener =
+            () => this.instance.transition("onWebSocketClose");
+        this.onMessageListener = (data: ws.Data): void => {
+            const message = JSON.parse(data.toString("utf-8"));
+            if (message.type !== "subscriptions") return;
+            const response = message as SubscriptionsResponse;
+
+            const subscriptionSuccessful =
+                this.request.channels.every(requestedChannel => {
+                    const channel =
+                        response.channels.find(possibleChannel =>
+                            possibleChannel.name == requestedChannel.name);
+                    if (!channel) return false;
+
+                    return requestedChannel.product_ids.
+                        every(requestedProductId =>
+                            channel.product_ids.includes(requestedProductId));
+                });
+
+            if (subscriptionSuccessful)
+                this.instance.transition("onSubscribed", response);
+            else this.instance.transition("onSubscriptionFailed");
+        };
+
+        this.instance.context.webSocket!.on("close", this.onCloseListener);
+        this.instance.context.webSocket!.on("message", this.onMessageListener);
+
+        // TODO: remove
+        this.instance.options.logger?.debug(
+            util.inspect({
+                listenerCounts: {
+                    close: this.instance.context.webSocket!.listenerCount("close"),
+                    message: this.instance.context.webSocket!.listenerCount("message"),
+                },
+            }, { compact: true, colors: true })
+        );
+
+        this.instance.context.webSocket!
+            .send(JSON.stringify(this.request));
+    }
+
+    public override onWebSocketClose() {
+        this.instance.context.webSocket!
+            .removeListener("close", this.onCloseListener!);
+        this.instance.context.webSocket!
+            .removeListener("message", this.onMessageListener!);
+
+        return new ReconnectingWebSocketDisconnectedState(this.instance);
+    }
+
+    public override onSubscribed(response: SubscriptionsResponse) {
+        this.instance.context.webSocket!
+            .removeListener("close", this.onCloseListener!);
+        this.instance.context.webSocket!
+            .removeListener("message", this.onMessageListener!);
+
+        this.instance.context.subscribedChannels = response.channels;
+        return new ReconnectingWebSocketSubscribedState(this.instance);
+    }
+
+    public override onSubscriptionFailed() {
+        this.instance.context.webSocket!
+            .removeListener("close", this.onCloseListener!);
+        this.instance.context.webSocket!
+            .removeListener("message", this.onMessageListener!);
+
+        return new ReconnectingWebSocketFailedState(this.instance);
+    }
+
+}
+
+class ReconnectingWebSocketSubscribedState
+    extends ReconnectingWebSocketState {
+
+    private onCloseListener?: () => void;
+
+    public get name(): ReconnectingWebSocketStateName {
+        return "Subscribed";
+    }
+
+    public handle(): void {
+        this.onCloseListener =
+            () => this.instance.transition("onWebSocketClose");
+        this.instance.context.webSocket!.on("close", this.onCloseListener);
+
+        // TODO: remove
+        this.instance.options.logger?.debug(
+            util.inspect({
+                listenerCounts: {
+                    close: this.instance.context.webSocket!.listenerCount("close"),
+                },
+            }, { compact: true, colors: true })
+        );
+    }
+
+    public override onWebSocketClose() {
+        this.instance.context.webSocket!
+            .removeListener("close", this.onCloseListener!);
+
+        return new ReconnectingWebSocketDisconnectedState(this.instance);
     }
 
 }
@@ -232,8 +468,7 @@ type ReconnectingWebSocketInternalsEvent =
         ReconnectingWebSocketStateName
     }`;
 
-class ReconnectingWebSocketInternals
-    implements ReconnectingWebSocketOperations, ReconnectingWebSocketEvents {
+class ReconnectingWebSocketInternals {
 
     public options: ReconnectingWebSocketOptions;
     public context: ReconnectingWebSocketContext;
@@ -249,25 +484,21 @@ class ReconnectingWebSocketInternals
         this.events = new EventEmitter();
     }
 
-    private transition(
+    public transition(
         actionName:
             ReconnectingWebSocketOperationNames |
-            ReconnectingWebSocketEventNames
+            ReconnectingWebSocketEventNames,
+        ...args: any
     ): void {
         const previousState = this.state;
-        const nextState = previousState[actionName]();
+        const nextState = previousState[actionName](...args);
+        this.options.logger?.debug(
+            `transitioned from ${previousState.name} to ${nextState.name}`);
         this.events.emit(
             `transitionedFrom${previousState.name}To${nextState.name}`);
         this.state = nextState;
         this.state.handle();
     }
-
-    public connect(): void { this.transition("connect"); }
-    public reconnect(): void { this.transition("reconnect"); }
-
-    public onWebSocketOpen(): void { this.transition("onWebSocketOpen"); }
-    public onWebSocketError(): void { this.transition("onWebSocketError"); }
-    public onWebSocketClose(): void { this.transition("onWebSocketClose"); }
 
     public on(
         event: ReconnectingWebSocketInternalsEvent,
@@ -306,18 +537,53 @@ export class ReconnectingWebSocket {
                 "transitionedFromConnectingToIdle",
                 () => reject(/* TODO: more reasonable error message */)
             );
-            this.internals.connect();
+            this.internals.transition("connect");
+        });
+    }
+
+    public subscribe(request: SubscribeRequest): Promise<void> {
+        if (!(this.internals.state instanceof ReconnectingWebSocketConnectedState))
+            return Promise.reject("wrong state" /* TODO: more reasonable error message */);
+
+        return new Promise<void>((resolve, reject) => {
+            this.internals.once(
+                "transitionedFromSubscribingToSubscribed",
+                () => resolve()
+            );
+            this.internals.once(
+                "transitionedFromSubscribingToFailed",
+                () => reject(/* TODO: more reasonable error message */)
+            );
+            this.internals.transition("subscribe", request);
         });
     }
 
 }
 
-const socket = new ReconnectingWebSocket({
-    url: "wss://ws-feed.pro.coinbase.com",
-    reconnectDelay: 1000,
-    maxReconnectTries: 60,
-});
-socket
-    .connect()
-    .then(() => console.log("😊"))
-    .catch(() => console.log("😩"));
+(async () => {
+
+    const logger = winston.createLogger({
+        level: "debug",
+        format: winston.format.combine(
+            winston.format.colorize(),
+            winston.format.simple(),
+        ),
+        transports: [ new winston.transports.Console() ],
+    });
+
+    const socket = new ReconnectingWebSocket({
+        logger,
+        url: "wss://ws-feed.pro.coinbase.com",
+        reconnectDelay: 1000,
+        maxReconnectTries: 60,
+    });
+    await socket.connect();
+    await socket.subscribe({
+        type: "subscribe",
+        channels: [
+            { name: "heartbeat", product_ids: [ "ETH-USD" ] },
+        ],
+    }); // TODO: only pass product_ids
+
+})();
+
