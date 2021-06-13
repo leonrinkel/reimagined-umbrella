@@ -22,7 +22,8 @@ type ReconnectingWebSocketEventNames =
     "onWebSocketError" |
     "onWebSocketClose" |
     "onSubscribed" |
-    "onSubscriptionFailed";
+    "onSubscriptionFailed" |
+    "onHeartbeatTimeout";
 type ReconnectingWebSocketEvents =
     Record<ReconnectingWebSocketEventNames, (...args: any) => void>;
 
@@ -49,7 +50,8 @@ type ReconnectingWebSocketStateName =
     "Reconnected" |
     "WaitingToReconnect" |
     "Subscribing" |
-    "Subscribed";
+    "Subscribed" |
+    "Timeouted";
 
 abstract class ReconnectingWebSocketState
     implements ReconnectingWebSocketOperations, ReconnectingWebSocketEvents {
@@ -463,6 +465,9 @@ class ReconnectingWebSocketSubscribedState
     private onCloseListener?: () => void;
     private onMessageListener?: (data: ws.Data) => void;
 
+    private lastHeartbeat?: Date;
+    private heartbeatCheckInterval?: NodeJS.Timeout;
+
     public get name(): ReconnectingWebSocketStateName {
         return "Subscribed";
     }
@@ -473,14 +478,26 @@ class ReconnectingWebSocketSubscribedState
         this.onMessageListener =
             (data: ws.Data) => {
                 const message = JSON.parse(data.toString("utf-8"), TimeReviver);
-                if (message.type === "heartbeat")
+                if (message.type === "heartbeat") {
                     this.instance.events.emit("heartbeat", message);
-                else if (message.type === "ticker")
+                    this.lastHeartbeat = (message as HeartbeatResponse).time;
+                } else if (message.type === "ticker") {
                     this.instance.events.emit("ticker", message);
+                }
             };
 
         this.instance.context.webSocket!.on("close", this.onCloseListener);
         this.instance.context.webSocket!.on("message", this.onMessageListener);
+
+        setInterval(
+            () => {
+                if (
+                    this.lastHeartbeat &&
+                    this.lastHeartbeat.getTime() < Date.now() - 10_000 /* TODO */
+                ) this.instance.transition("onHeartbeatTimeout");
+            },
+            10_000 /* TODO */
+        );
 
         // TODO: remove
         this.instance.options.logger?.debug(
@@ -498,12 +515,29 @@ class ReconnectingWebSocketSubscribedState
             .removeListener("close", this.onCloseListener!);
         this.instance.context.webSocket!
             .removeListener("message", this.onMessageListener!);
+        clearInterval(this.heartbeatCheckInterval!);
     }
 
     public override onWebSocketClose() {
         this.cleanUpListeners();
         return new ReconnectingWebSocketDisconnectedState(this.instance);
     }
+
+    public override onHeartbeatTimeout() {
+        this.cleanUpListeners();
+        return new ReconnectingWebSocketTimeoutedState(this.instance);
+    }
+
+}
+
+class ReconnectingWebSocketTimeoutedState
+    extends ReconnectingWebSocketState {
+
+    public get name(): ReconnectingWebSocketStateName {
+        return "Timeouted";
+    }
+
+    public handle(): void {}
 
 }
 
@@ -536,7 +570,7 @@ class ReconnectingWebSocketInternals {
     ): void {
         const previousState = this.state;
         const nextState = previousState[actionName](...args);
-        this.options.logger?.debug(
+        this.options.logger?.info(
             `transitioned from ${previousState.name} to ${nextState.name}`);
         this.events.emit(
             `transitionedFrom${previousState.name}To${nextState.name}`);
