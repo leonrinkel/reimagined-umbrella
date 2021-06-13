@@ -33,7 +33,7 @@ type ReconnectingWebSocketOptions = {
 type ReconnectingWebSocketContext = {
     webSocket?: ws;
     reconnectTries?: number;
-    subscribedChannels?: Channel[];
+    productIds?: string[];
 };
 
 type ReconnectingWebSocketStateName =
@@ -195,9 +195,9 @@ class ReconnectingWebSocketConnectedState
         return new ReconnectingWebSocketDisconnectedState(this.instance);
     }
 
-    public override subscribe(request: SubscribeRequest) {
+    public override subscribe(productIds: string[]) {
         this.cleanUpListeners();
-        return new ReconnectingWebSocketSubscribingState(this.instance, request);
+        return new ReconnectingWebSocketSubscribingState(this.instance, productIds);
     }
 
 }
@@ -301,6 +301,9 @@ class ReconnectingWebSocketReconnectedState
             () => this.instance.transition("onWebSocketClose");
         this.instance.context.webSocket!.on("close", this.onCloseListener);
 
+        setTimeout(() => this.instance.transition(
+            "subscribe", this.instance.context.productIds));
+
         // TODO: remove
         this.instance.options.logger?.debug(
             util.inspect({
@@ -319,6 +322,11 @@ class ReconnectingWebSocketReconnectedState
     public override onWebSocketClose() {
         this.cleanUpListeners();
         return new ReconnectingWebSocketDisconnectedState(this.instance);
+    }
+
+    public override subscribe(productIds: string[]) {
+        this.cleanUpListeners();
+        return new ReconnectingWebSocketSubscribingState(this.instance, productIds);
     }
 
 }
@@ -347,17 +355,15 @@ class ReconnectingWebSocketWaitingToReconnectState
 class ReconnectingWebSocketSubscribingState
     extends ReconnectingWebSocketState {
 
-    private request: SubscribeRequest;
-
     private onCloseListener?: () => void;
     private onMessageListener?: (data: ws.Data) => void;
 
     constructor(
         instance: ReconnectingWebSocketInternals,
-        request: SubscribeRequest
+        productIds: string[]
     ) {
         super(instance);
-        this.request = request;
+        this.instance.context.productIds = productIds;
     }
 
     public get name(): ReconnectingWebSocketStateName {
@@ -365,6 +371,20 @@ class ReconnectingWebSocketSubscribingState
     }
 
     public handle(): void {
+        const request: SubscribeRequest = {
+            type: "subscribe",
+            channels: [
+                {
+                    name: "heartbeat",
+                    product_ids: this.instance.context.productIds!,
+                },
+                {
+                    name: "ticker",
+                    product_ids: this.instance.context.productIds!,
+                },
+            ],
+        };
+
         this.onCloseListener =
             () => this.instance.transition("onWebSocketClose");
         this.onMessageListener = (data: ws.Data): void => {
@@ -373,7 +393,7 @@ class ReconnectingWebSocketSubscribingState
             const response = message as SubscriptionsResponse;
 
             const subscriptionSuccessful =
-                this.request.channels.every(requestedChannel => {
+                request.channels.every(requestedChannel => {
                     const channel =
                         response.channels.find(possibleChannel =>
                             possibleChannel.name == requestedChannel.name);
@@ -403,7 +423,7 @@ class ReconnectingWebSocketSubscribingState
         );
 
         this.instance.context.webSocket!
-            .send(JSON.stringify(this.request));
+            .send(JSON.stringify(request));
     }
 
     private cleanUpListeners() {
@@ -419,8 +439,7 @@ class ReconnectingWebSocketSubscribingState
     }
 
     public override onSubscribed(response: SubscriptionsResponse) {
-        this.cleanUpListeners(),
-        this.instance.context.subscribedChannels = response.channels;
+        this.cleanUpListeners();
         return new ReconnectingWebSocketSubscribedState(this.instance);
     }
 
@@ -435,6 +454,7 @@ class ReconnectingWebSocketSubscribedState
     extends ReconnectingWebSocketState {
 
     private onCloseListener?: () => void;
+    private onMessageListener?: (data: ws.Data) => void;
 
     public get name(): ReconnectingWebSocketStateName {
         return "Subscribed";
@@ -443,13 +463,18 @@ class ReconnectingWebSocketSubscribedState
     public handle(): void {
         this.onCloseListener =
             () => this.instance.transition("onWebSocketClose");
+        this.onMessageListener =
+            (data: ws.Data) => console.log(data.toString("utf-8"));
+
         this.instance.context.webSocket!.on("close", this.onCloseListener);
+        this.instance.context.webSocket!.on("message", this.onMessageListener);
 
         // TODO: remove
         this.instance.options.logger?.debug(
             util.inspect({
                 listenerCounts: {
                     close: this.instance.context.webSocket!.listenerCount("close"),
+                    message: this.instance.context.webSocket!.listenerCount("message"),
                 },
             }, { compact: true, colors: true })
         );
@@ -458,6 +483,8 @@ class ReconnectingWebSocketSubscribedState
     private cleanUpListeners() {
         this.instance.context.webSocket!
             .removeListener("close", this.onCloseListener!);
+        this.instance.context.webSocket!
+            .removeListener("message", this.onMessageListener!);
     }
 
     public override onWebSocketClose() {
@@ -547,7 +574,7 @@ export class ReconnectingWebSocket {
         });
     }
 
-    public subscribe(request: SubscribeRequest): Promise<void> {
+    public subscribe(...productIds: string[]): Promise<void> {
         if (!(this.internals.state instanceof ReconnectingWebSocketConnectedState))
             return Promise.reject("wrong state" /* TODO: more reasonable error message */);
 
@@ -560,7 +587,7 @@ export class ReconnectingWebSocket {
                 "transitionedFromSubscribingToFailed",
                 () => reject(/* TODO: more reasonable error message */)
             );
-            this.internals.transition("subscribe", request);
+            this.internals.transition("subscribe", productIds);
         });
     }
 
@@ -584,12 +611,7 @@ export class ReconnectingWebSocket {
         maxReconnectTries: 60,
     });
     await socket.connect();
-    await socket.subscribe({
-        type: "subscribe",
-        channels: [
-            { name: "heartbeat", product_ids: [ "ETH-USD" ] },
-        ],
-    }); // TODO: only pass product_ids
+    await socket.subscribe("ETH-USD", "DAI-USD");
 
 })();
 
