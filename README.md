@@ -15,20 +15,20 @@ A simple Node.js® project that subscribes to the Coinbase WebSocket API and str
 ## Example Usages
 
 ```
-$ INFLUX_TOKEN=... \
-  INFLUX_URL=http://influxdb:8086 \
-  PRODUCT_IDS=ETH-USD,YFI-USD \
-  npx reimagined-umbrella
+INFLUX_TOKEN=... \
+INFLUX_URL=http://influxdb:8086 \
+PRODUCT_IDS=ETH-USD,YFI-USD \
+npx reimagined-umbrella
 ```
 
 ```
-$ docker run \
-  --env INFLUX_TOKEN=... \
-  --env INFLUX_URL=http://influxdb:8086 \
-  --env PRODUCT_IDS=ETH-USD,YFI-USD \
-  --restart always \
-  --detach \
-  leonrinkel/reimagined-umbrella
+docker run \
+--env INFLUX_TOKEN=... \
+--env INFLUX_URL=http://influxdb:8086 \
+--env PRODUCT_IDS=ETH-USD,YFI-USD \
+--restart always \
+--detach \
+leonrinkel/reimagined-umbrella
 ```
 
 ## Example Dashboard
