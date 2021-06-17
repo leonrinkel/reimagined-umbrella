@@ -8,7 +8,12 @@ import { CoinbaseWebSocket } from "./coinbase-ws";
 const DEFAULT_INFLUX_URL = "http://localhost:8086";
 const DEFAULT_INFLUX_ORG = "reimagined-umbrella";
 const DEFAULT_INFLUX_BUCKET = "reimagined-umbrella";
-const DEFAULT_FLUSH_INTERVAL = 10_000 /* ms */; // bundle writes and flush after some time
+const DEFAULT_INFLUX_FLUSH_INTERVAL = 10_000 /* ms */; // bundle writes and flush after some time
+
+const DEFAULT_COINBASE_URL = "wss://ws-feed.pro.coinbase.com";
+const DEFAULT_COINBASE_RECONNECT_DELAY = 1_000 /* ms */;
+const DEFAULT_COINBASE_MAX_RECONNECT_TRIES = 60;
+const DEFAULT_COINBASE_TIMEOUT_INTERVAL = 10_000 /* ms */;
 
 // influx measurement name, tag name, field names to use
 const MEASUREMENT_NAME = "ticker";
@@ -24,9 +29,6 @@ const MEASUREMENT_FIELD_BEST_BID = "best_bid";
 const MEASUREMENT_FIELD_BEST_ASK = "best_ask";
 const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
 
-// the program will timeout if no heartbeat events have been received
-const TIMEOUT_INTERVAL = 10_000 /* ms */;
-
 (async () => {
 
     const logger = winston.createLogger({
@@ -38,7 +40,7 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
         transports: [ new winston.transports.Console() ]
     });
 
-    // read env variable options
+    // read influx env variable options
 
     const influxUrl = process.env.INFLUX_URL || DEFAULT_INFLUX_URL;
     const influxOrg = process.env.INFLUX_ORG || DEFAULT_INFLUX_ORG;
@@ -46,13 +48,29 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
     const influxFlushInterval =
         (process.env.INFLUX_FLUSH_INTERVAL) ?
             Number(process.env.INFLUX_FLUSH_INTERVAL) :
-            DEFAULT_FLUSH_INTERVAL;
+            DEFAULT_INFLUX_FLUSH_INTERVAL;
 
     const influxToken = process.env.INFLUX_TOKEN;
     if (!influxToken) {
         logger.error("INFLUX_TOKEN environment variable has to be specified");
         process.exit(1);
     }
+
+    // read coinbase env variable options
+
+    const url = process.env.COINBASE_URL || DEFAULT_COINBASE_URL;
+    const reconnectDelay =
+        (process.env.COINBASE_RECONNECT_DELAY) ?
+            Number(process.env.COINBASE_RECONNECT_DELAY) :
+            DEFAULT_COINBASE_RECONNECT_DELAY;
+    const maxReconnectTries =
+        (process.env.COINBASE_MAX_RECONNECT_TRIES) ?
+            Number(process.env.COINBASE_MAX_RECONNECT_TRIES) :
+            DEFAULT_COINBASE_MAX_RECONNECT_TRIES;
+    const timeoutInterval =
+        (process.env.COINBASE_TIMEOUT_INTERVAL) ?
+            Number(process.env.COINBASE_TIMEOUT_INTERVAL) :
+            DEFAULT_COINBASE_TIMEOUT_INTERVAL;
 
     const productIds = process.env.PRODUCT_IDS; // comma separated list
     if (!productIds) {
@@ -78,14 +96,22 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
 
     // create a new coinbase socket and register event listeners
 
-    const coinbase = new CoinbaseWebSocket({ logger });
+    const coinbase = new CoinbaseWebSocket({
+        logger, url, reconnectDelay, maxReconnectTries, timeoutInterval });
 
-    let lastHeartbeat = new Date();
-    coinbase.on("heartbeat", (heartbeat) => {
-        lastHeartbeat = heartbeat.time;
-    });
+    coinbase.on("heartbeat", (heartbeat) =>
+        logger.debug(
+            "received heartbeat\n" +
+            util.inspect(heartbeat, { compact: true, colors: true })
+        )
+    );
 
     coinbase.on("ticker", (ticker) => {
+        logger.debug(
+            "received ticker\n" +
+            util.inspect(ticker, { compact: true, colors: true })
+        );
+
         // create point and queue to write
         const point = new Point(MEASUREMENT_NAME);
         point
@@ -104,10 +130,15 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
         writeApi.writePoint(point);
     });
 
+    coinbase.on("failure", () => {
+        logger.error("coinbase connection ultimately failed, exiting...");
+        process.exit(1);
+    });
+
     // open connection and subscribe to channels
 
     await coinbase
-        .open()
+        .connect()
         .then(() => logger.info("successfully connected to coinbase"))
         .catch(() => {
             logger.error("unable to connect to coinbase, exiting...");
@@ -115,35 +146,11 @@ const TIMEOUT_INTERVAL = 10_000 /* ms */;
         });
 
     await coinbase
-        .subscribeHeartbeat(...productIds.split(","))
-        .then(() => logger.info("successfully subscribed to heartbeat channels"))
+        .subscribe(...productIds.split(","))
+        .then(() => logger.info("successfully subscribed to api channels"))
         .catch(() => {
-            logger.info("unable to subscribe to heartbeat channels, exiting...");
+            logger.error("unable to subscribe to api channels, exiting...");
             process.exit(1);
         });
-
-    await coinbase
-        .subscribeTicker(...productIds.split(","))
-        .then(() => logger.info("successfully subscribed to ticker channels"))
-        .catch(() => {
-            logger.info("unable to subscribe to ticker channels, exiting...");
-            process.exit(1);
-        });
-
-    // monitor heartbeats
-    setInterval(() => {
-        if (lastHeartbeat.getTime() < Date.now() - TIMEOUT_INTERVAL) {
-            logger.warn("received no heartbeats for more than " +
-                `${TIMEOUT_INTERVAL} ms, trying to reconnect...`);
-
-            coinbase
-                .reconnect()
-                .then(() => logger.info("successfully reconnected"))
-                .catch(() => {
-                    logger.error("unable to reconnect, exiting...");
-                    process.exit(1);
-                });
-        }
-    }, TIMEOUT_INTERVAL);
 
 })();
