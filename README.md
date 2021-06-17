@@ -7,7 +7,7 @@
 [![](https://img.shields.io/github/contributors/leonrinkel/reimagined-umbrella)](https://github.com/leonrinkel/reimagined-umbrella/graphs/contributors)
 [![](https://img.shields.io/github/workflow/status/leonrinkel/reimagined-umbrella/Node.js%20CI/main)](https://github.com/leonrinkel/reimagined-umbrella/actions/workflows/node.js.yml)
 [![](https://img.shields.io/github/workflow/status/leonrinkel/reimagined-umbrella/CodeQL/main?label=CodeQL&logo=github)](https://github.com/leonrinkel/reimagined-umbrella/security/code-scanning)
-[![](https://img.shields.io/github/workflow/status/leonrinkel/reimagined-umbrella/Docker/main?logo=docker)](https://github.com/users/leonrinkel/packages/container/package/reimagined-umbrella)
+[![](https://img.shields.io/github/workflow/status/leonrinkel/reimagined-umbrella/Docker/main?logo=docker)](https://hub.docker.com/r/leonrinkel/reimagined-umbrella)
 [![](https://img.shields.io/node/v/reimagined-umbrella)](https://github.com/leonrinkel/reimagined-umbrella/blob/main/package.json)
 
 A simple Node.js® project that subscribes to the Coinbase WebSocket API and streams ticker data into InfluxDB.
@@ -15,24 +15,20 @@ A simple Node.js® project that subscribes to the Coinbase WebSocket API and str
 ## Example Usages
 
 ```
-$ yarn install
-$ yarn run build
 $ INFLUX_TOKEN=... \
   INFLUX_URL=http://influxdb:8086 \
   PRODUCT_IDS=ETH-USD,YFI-USD \
-  yarn run start
+  npx reimagined-umbrella
 ```
 
 ```
-$ docker build -t reimagined-umbrella .
 $ docker run \
-  --name reimagined-umbrella \
   --env INFLUX_TOKEN=... \
   --env INFLUX_URL=http://influxdb:8086 \
   --env PRODUCT_IDS=ETH-USD,YFI-USD \
   --restart always \
   --detach \
-  reimagined-umbrella
+  leonrinkel/reimagined-umbrella
 ```
 
 ## Example Dashboard
