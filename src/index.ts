@@ -8,7 +8,12 @@ import { CoinbaseWebSocket } from "./coinbase-ws";
 const DEFAULT_INFLUX_URL = "http://localhost:8086";
 const DEFAULT_INFLUX_ORG = "reimagined-umbrella";
 const DEFAULT_INFLUX_BUCKET = "reimagined-umbrella";
-const DEFAULT_FLUSH_INTERVAL = 10_000 /* ms */; // bundle writes and flush after some time
+const DEFAULT_INFLUX_FLUSH_INTERVAL = 10_000 /* ms */; // bundle writes and flush after some time
+
+const DEFAULT_COINBASE_URL = "wss://ws-feed.pro.coinbase.com";
+const DEFAULT_COINBASE_RECONNECT_DELAY = 1_000 /* ms */;
+const DEFAULT_COINBASE_MAX_RECONNECT_TRIES = 60;
+const DEFAULT_COINBASE_TIMEOUT_INTERVAL = 10_000 /* ms */;
 
 // influx measurement name, tag name, field names to use
 const MEASUREMENT_NAME = "ticker";
@@ -43,7 +48,7 @@ const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
     const influxFlushInterval =
         (process.env.INFLUX_FLUSH_INTERVAL) ?
             Number(process.env.INFLUX_FLUSH_INTERVAL) :
-            DEFAULT_FLUSH_INTERVAL;
+            DEFAULT_INFLUX_FLUSH_INTERVAL;
 
     const influxToken = process.env.INFLUX_TOKEN;
     if (!influxToken) {
@@ -77,10 +82,10 @@ const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
 
     const coinbase = new CoinbaseWebSocket({
         logger,
-        url: "wss://ws-feed.pro.coinbase.com", // TODO: make env option
-        reconnectDelay: 1000, // TODO: make env option
-        maxReconnectTries: 60, // TODO: make env option
-        timeoutInterval: 10000, // TODO: make env option
+        url: DEFAULT_COINBASE_URL,
+        reconnectDelay: DEFAULT_COINBASE_RECONNECT_DELAY,
+        maxReconnectTries: DEFAULT_COINBASE_MAX_RECONNECT_TRIES,
+        timeoutInterval: DEFAULT_COINBASE_TIMEOUT_INTERVAL,
     })
 
     coinbase.on("heartbeat", (heartbeat) =>
@@ -128,7 +133,7 @@ const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
         .subscribe(...productIds.split(","))
         .then(() => logger.info("successfully subscribed to api channels"))
         .catch(() => {
-            logger.info("unable to subscribe to api channels, exiting...");
+            logger.error("unable to subscribe to api channels, exiting...");
             process.exit(1);
         });
 
