@@ -130,6 +130,11 @@ const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
         writeApi.writePoint(point);
     });
 
+    coinbase.on("failure", () => {
+        logger.error("coinbase connection ultimately failed, exiting...");
+        process.exit(1);
+    });
+
     // open connection and subscribe to channels
 
     await coinbase

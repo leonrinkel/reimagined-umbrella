@@ -1,3 +1,5 @@
+/* TODO: comment */
+
 import { EventEmitter } from "events";
 import util from "util";
 import winston from "winston";
@@ -140,16 +142,6 @@ class CoinbaseWebSocketConnectingState
 
         this.instance.context.webSocket.on("open", this.onOpenListener);
         this.instance.context.webSocket.on("error", this.onErrorListener);
-
-        // TODO: remove
-        this.instance.options.logger?.debug(
-            util.inspect({
-                listenerCounts: {
-                    open: this.instance.context.webSocket.listenerCount("open"),
-                    error: this.instance.context.webSocket.listenerCount("error"),
-                },
-            }, { compact: true, colors: true })
-        );
     }
 
     private cleanUpListeners() {
@@ -184,15 +176,6 @@ class CoinbaseWebSocketConnectedState
         this.onCloseListener =
             () => this.instance.transition("onWebSocketClose");
         this.instance.context.webSocket!.on("close", this.onCloseListener);
-
-        // TODO: remove
-        this.instance.options.logger?.debug(
-            util.inspect({
-                listenerCounts: {
-                    close: this.instance.context.webSocket!.listenerCount("close"),
-                }
-            }, { compact: true, colors: true })
-        );
     }
 
     private cleanUpListeners() {
@@ -219,7 +202,9 @@ class CoinbaseWebSocketFailedState
         return "Failed";
     }
 
-    public handle(): void { /* TODO: event */ }
+    public handle(): void {
+        this.instance.events.emit("failure");
+    }
 
 }
 
@@ -261,16 +246,6 @@ class CoinbaseWebSocketReconnectingState
 
         this.instance.context.webSocket.on("open", this.onOpenListener);
         this.instance.context.webSocket.on("error", this.onErrorListener);
-
-        // TODO: remove
-        this.instance.options.logger?.debug(
-            util.inspect({
-                listenerCounts: {
-                    open: this.instance.context.webSocket!.listenerCount("open"),
-                    error: this.instance.context.webSocket!.listenerCount("error"),
-                },
-            }, { compact: true, colors: true })
-        );
     }
 
     private cleanUpListeners() {
@@ -315,15 +290,6 @@ class CoinbaseWebSocketReconnectedState
 
         this.transitionTimeout = setTimeout(() => this.instance
             .transition("subscribe", this.instance.context.productIds));
-
-        // TODO: remove
-        this.instance.options.logger?.debug(
-            util.inspect({
-                listenerCounts: {
-                    close: this.instance.context.webSocket!.listenerCount("close"),
-                },
-            }, { compact: true, colors: true })
-        );
     }
 
     private cleanUpListeners() {
@@ -425,16 +391,6 @@ class CoinbaseWebSocketSubscribingState
         this.instance.context.webSocket!.on("close", this.onCloseListener);
         this.instance.context.webSocket!.on("message", this.onMessageListener);
 
-        // TODO: remove
-        this.instance.options.logger?.debug(
-            util.inspect({
-                listenerCounts: {
-                    close: this.instance.context.webSocket!.listenerCount("close"),
-                    message: this.instance.context.webSocket!.listenerCount("message"),
-                },
-            }, { compact: true, colors: true })
-        );
-
         this.instance.context.webSocket!
             .send(JSON.stringify(request));
     }
@@ -503,16 +459,6 @@ class CoinbaseWebSocketSubscribedState
             },
             this.instance.options.timeoutInterval
         );
-
-        // TODO: remove
-        this.instance.options.logger?.debug(
-            util.inspect({
-                listenerCounts: {
-                    close: this.instance.context.webSocket!.listenerCount("close"),
-                    message: this.instance.context.webSocket!.listenerCount("message"),
-                },
-            }, { compact: true, colors: true })
-        );
     }
 
     private cleanUpListeners() {
@@ -552,15 +498,6 @@ class CoinbaseWebSocketTimeoutedState
 
         this.reconnectTimeout =
             setTimeout(() => this.instance.transition("reconnect"));
-
-        // TODO: remove
-        this.instance.options.logger?.debug(
-            util.inspect({
-                listenerCounts: {
-                    close: this.instance.context.webSocket!.listenerCount("close"),
-                },
-            }, { compact: true, colors: true })
-        );
     }
 
     private cleanUpListeners() {
@@ -622,7 +559,7 @@ class CoinbaseWebSocketInternals {
     public on(
         event:
             CoinbaseWebSocketTransitionEvent |
-            "heartbeat" | "ticker",
+            "heartbeat" | "ticker" | "failed",
         listener: () => void
     ): void {
         this.events.on(event, listener);
@@ -631,7 +568,7 @@ class CoinbaseWebSocketInternals {
     public once(
         event:
             CoinbaseWebSocketTransitionEvent |
-            "heartbeat" | "ticker",
+            "heartbeat" | "ticker" | "failed",
         listener: () => void
     ): void {
         this.events.once(event, listener);
@@ -651,6 +588,11 @@ export declare interface CoinbaseWebSocket {
         listener: (e: TickerResponse) => void
     ): void;
 
+    on(
+        event: "failure",
+        listener: () => void
+    ): void;
+
     once(
         event: "heartbeat",
         listener: (e: HeartbeatResponse) => void
@@ -659,6 +601,11 @@ export declare interface CoinbaseWebSocket {
     once(
         event: "ticker",
         listener: (e: TickerResponse) => void
+    ): void;
+
+    once(
+        event: "failure",
+        listener: () => void
     ): void;
 
 }
@@ -673,7 +620,8 @@ export class CoinbaseWebSocket {
 
     public connect(): Promise<void> {
         if (!(this.internals.state instanceof CoinbaseWebSocketIdleState))
-            return Promise.reject("wrong state" /* TODO: more reasonable error message */);
+            return Promise.reject("cannot connect because the socket is " +
+                "already in a connected state");
 
         return new Promise<void>((resolve, reject) => {
             this.internals.once(
@@ -682,7 +630,7 @@ export class CoinbaseWebSocket {
             );
             this.internals.once(
                 "transitionedFromConnectingToIdle",
-                () => reject(/* TODO: more reasonable error message */)
+                () => reject("connection failed")
             );
             this.internals.transition("connect");
         });
@@ -690,7 +638,8 @@ export class CoinbaseWebSocket {
 
     public subscribe(...productIds: string[]): Promise<void> {
         if (!(this.internals.state instanceof CoinbaseWebSocketConnectedState))
-            return Promise.reject("wrong state" /* TODO: more reasonable error message */);
+            return Promise.reject("cannot subscribe because the socket is " +
+                "not in a connected state");
 
         return new Promise<void>((resolve, reject) => {
             this.internals.once(
@@ -699,21 +648,21 @@ export class CoinbaseWebSocket {
             );
             this.internals.once(
                 "transitionedFromSubscribingToFailed",
-                () => reject(/* TODO: more reasonable error message */)
+                () => reject("subscription failed")
             );
             this.internals.transition("subscribe", productIds);
         });
     }
 
     public on(
-        event: "heartbeat" | "ticker",
+        event: "heartbeat" | "ticker" | "failure",
         listener: (...args: any) => void
     ): void {
         this.internals.events.on(event, listener);
     }
 
     public once(
-        event: "heartbeat" | "ticker",
+        event: "heartbeat" | "ticker" | "failure",
         listener: (...args: any) => void
     ): void {
         this.internals.events.once(event, listener);
