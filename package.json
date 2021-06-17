@@ -1,6 +1,6 @@
 {
   "name": "reimagined-umbrella",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A simple Node.js® project that subscribes to the Coinbase WebSocket API and streams ticker data into InfluxDB.",
   "main": "dist/src/index.js",
   "repository": "https://github.com/leonrinkel/reimagined-umbrella.git",
