@@ -40,7 +40,7 @@ const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
         transports: [ new winston.transports.Console() ]
     });
 
-    // read env variable options
+    // read influx env variable options
 
     const influxUrl = process.env.INFLUX_URL || DEFAULT_INFLUX_URL;
     const influxOrg = process.env.INFLUX_ORG || DEFAULT_INFLUX_ORG;
@@ -55,6 +55,22 @@ const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
         logger.error("INFLUX_TOKEN environment variable has to be specified");
         process.exit(1);
     }
+
+    // read coinbase env variable options
+
+    const url = process.env.COINBASE_URL || DEFAULT_COINBASE_URL;
+    const reconnectDelay =
+        (process.env.COINBASE_RECONNECT_DELAY) ?
+            Number(process.env.COINBASE_RECONNECT_DELAY) :
+            DEFAULT_COINBASE_RECONNECT_DELAY;
+    const maxReconnectTries =
+        (process.env.COINBASE_MAX_RECONNECT_TRIES) ?
+            Number(process.env.COINBASE_MAX_RECONNECT_TRIES) :
+            DEFAULT_COINBASE_MAX_RECONNECT_TRIES;
+    const timeoutInterval =
+        (process.env.COINBASE_TIMEOUT_INTERVAL) ?
+            Number(process.env.COINBASE_TIMEOUT_INTERVAL) :
+            DEFAULT_COINBASE_TIMEOUT_INTERVAL;
 
     const productIds = process.env.PRODUCT_IDS; // comma separated list
     if (!productIds) {
@@ -81,12 +97,7 @@ const MEASUREMENT_FIELD_LAST_SIZE = "last_size";
     // create a new coinbase socket and register event listeners
 
     const coinbase = new CoinbaseWebSocket({
-        logger,
-        url: DEFAULT_COINBASE_URL,
-        reconnectDelay: DEFAULT_COINBASE_RECONNECT_DELAY,
-        maxReconnectTries: DEFAULT_COINBASE_MAX_RECONNECT_TRIES,
-        timeoutInterval: DEFAULT_COINBASE_TIMEOUT_INTERVAL,
-    })
+        logger, url, reconnectDelay, maxReconnectTries, timeoutInterval });
 
     coinbase.on("heartbeat", (heartbeat) =>
         logger.debug(
