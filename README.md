@@ -31,6 +31,7 @@ docker run \
 leonrinkel/reimagined-umbrella
 ```
 
-## Example Dashboard
+## Example Dashboards
 
-![Crypto Price Ticker Dashboard Screenshot](dashboard.png)
+![Influx Dashboard Screenshot](influx-dashboard.png)
+![Grafana Dashboard Screenshot](grafana-dashboard.png)
