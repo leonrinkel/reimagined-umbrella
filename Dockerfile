@@ -1,4 +1,4 @@
-FROM node:current-alpine3.13 AS BUILD_IMAGE
+FROM node:current-alpine3.12 AS BUILD_IMAGE
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY . .
 
 RUN yarn run build
 
-FROM node:current-alpine3.13
+FROM node:current-alpine3.12
 
 ENV NODE_ENV=production
 
