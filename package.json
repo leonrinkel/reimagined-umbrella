@@ -41,6 +41,6 @@
   "dependencies": {
     "@influxdata/influxdb-client": "^1.13.0",
     "winston": "^3.3.3",
-    "ws": "^7.4.6"
+    "ws": "^8.0.0"
   }
 }
