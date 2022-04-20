@@ -12,9 +12,9 @@
     kuler "^2.0.0"
 
 "@influxdata/influxdb-client@^1.13.0":
-  version "1.18.0"
-  resolved "https://registry.yarnpkg.com/@influxdata/influxdb-client/-/influxdb-client-1.18.0.tgz#e86d75b063d4c23ad094fb5dfa3b243731fe149a"
-  integrity sha512-0C2mKb5hR61WqiWzwEwqHvBkYzaFI4QLKaffGj3IPHoouKYoFQSCLHK5C3Jws25LopqWvellVimf12CsnZXzGg==
+  version "1.25.0"
+  resolved "https://registry.yarnpkg.com/@influxdata/influxdb-client/-/influxdb-client-1.25.0.tgz#60a854b818d920a3dcbeda780f4d69157dfbe42f"
+  integrity sha512-DC/sc2qAteIuUEyl9nKZNdt1746gS8w9Qu4gBsDEmOf+bQNUztjdApCWo0Rvz9h8pMb0kX/w3svKuxuYhpHehA==
 
 "@sinonjs/commons@^1.6.0", "@sinonjs/commons@^1.7.0", "@sinonjs/commons@^1.8.3":
   version "1.8.3"
